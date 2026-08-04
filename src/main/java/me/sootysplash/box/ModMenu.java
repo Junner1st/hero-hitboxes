@@ -10,10 +10,15 @@ import com.terraformersmc.modmenu.api.ModMenuApi;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
+import me.shedaniel.clothconfig2.gui.ClothConfigScreen;
+import me.shedaniel.clothconfig2.gui.entries.EmptyEntry;
+import me.shedaniel.clothconfig2.gui.widget.SearchFieldEntry;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
 import java.awt.Color;
+import java.util.List;
 
 public class ModMenu implements ModMenuApi {
     private static final String DEFAULT_NEW_ID = "minecraft:zombie";
@@ -46,6 +51,8 @@ public class ModMenu implements ModMenuApi {
                         config.save();
                         Minecraft.getInstance().execute(() -> Minecraft.getInstance().setScreenAndShow(getModConfigScreenFactory().create(parent)));
                     });
+            builder.setGlobalized(false);
+            builder.setAfterInitConsumer(ModMenu::removeSearchField);
 
             ConfigEntryBuilder cfgent = builder.entryBuilder();
             ConfigCategory behavior = builder.getOrCreateCategory(Component.nullToEmpty("Behavior"));
@@ -341,5 +348,28 @@ public class ModMenu implements ModMenuApi {
         pendingDefaultLookColor = pendingLookColor;
         pendingDefaultTargetColor = pendingTargetColor;
         pendingDefaultHurtColor = pendingHurtColor;
+    }
+
+    private static void removeSearchField(Screen screen) {
+        if (!(screen instanceof ClothConfigScreen clothConfigScreen)) {
+            return;
+        }
+
+        List<?> entries = clothConfigScreen.listWidget.children();
+        for (int index = 0; index < entries.size(); index++) {
+            if (!(entries.get(index) instanceof SearchFieldEntry)) {
+                continue;
+            }
+
+            entries.remove(index);
+            if (index > 0 && entries.get(index - 1) instanceof EmptyEntry) {
+                entries.remove(index - 1);
+                index--;
+            }
+            if (index < entries.size() && entries.get(index) instanceof EmptyEntry) {
+                entries.remove(index);
+            }
+            return;
+        }
     }
 }
