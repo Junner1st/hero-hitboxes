@@ -44,7 +44,7 @@ public class ModMenu implements ModMenuApi {
                     .setSavingRunnable(() -> {
                         addPendingHitboxType(config);
                         config.save();
-                        Minecraft.getInstance().execute(() -> Minecraft.getInstance().setScreen(getModConfigScreenFactory().create(parent)));
+                        Minecraft.getInstance().execute(() -> Minecraft.getInstance().setScreenAndShow(getModConfigScreenFactory().create(parent)));
                     });
 
             ConfigEntryBuilder cfgent = builder.entryBuilder();
