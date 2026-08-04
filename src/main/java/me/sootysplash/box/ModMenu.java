@@ -1,3 +1,8 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * Modifications Copyright (c) 2026 Junner
+ */
+
 package me.sootysplash.box;
 
 import com.terraformersmc.modmenu.api.ConfigScreenFactory;

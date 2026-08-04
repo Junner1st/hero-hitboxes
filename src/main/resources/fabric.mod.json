@@ -1,11 +1,12 @@
 {
 	"schemaVersion": 1,
-	"id": "combat-hitboxes",
+	"id": "hero-hitboxes",
 	"version": "${version}",
-	"name": "Combat Hitboxes",
+	"name": "Hero Hitboxes",
 	"description": "Modifies hitbox rendering to aid with attack timing and gauging your reach visually.",
 	"authors": [
-		"Sootysplash"
+		"Sootysplash",
+		"Junner"
 	],
 	"license": "Apache-2.0",
 	"icon": "assets/combat-hitboxes/icon.png",

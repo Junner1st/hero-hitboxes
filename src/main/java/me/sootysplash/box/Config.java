@@ -1,3 +1,8 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * Modifications Copyright (c) 2026 Junner
+ */
+
 package me.sootysplash.box;
 
 import com.google.gson.Gson;
@@ -13,7 +18,7 @@ public class Config {
 
     //Andy is the goat https://github.com/AndyRusso/pvplegacyutils/blob/main/src/main/java/io/github/andyrusso/pvplegacyutils/PvPLegacyUtilsConfig.java
 
-    private static final Path file = FabricLoader.getInstance().getConfigDir().resolve("combat-hitboxes.json");
+    private static final Path file = FabricLoader.getInstance().getConfigDir().resolve("hero-hitboxes.json");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static Config instance;
 
