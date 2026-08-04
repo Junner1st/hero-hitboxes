@@ -8,6 +8,7 @@ package me.sootysplash.box.mixin;
 import me.sootysplash.box.Config;
 import me.sootysplash.box.Main;
 import net.minecraft.client.renderer.debug.EntityHitboxDebugRenderer;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gizmos.GizmoStyle;
 import net.minecraft.gizmos.Gizmos;
 import net.minecraft.util.ARGB;
@@ -50,13 +51,15 @@ public abstract class HitBoxRenderMixin {
         }
 
         float lineWidth = Main.mc.player != null && Main.mc.player.distanceTo(entity) > config.distFor2 ? config.line2 : config.line1;
+        String entityId = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
+        Config.HitboxType hitboxType = config.getHitboxType(entityId);
 
         render_1_21_1_boxes(lineWidth, entity, tickProgress,
-                new Color(config.eyeColor, true),
-                new Color(config.lookColor, true),
-                new Color(config.hitBoxColor, true),
-                new Color(config.targetBoxColor, true),
-                new Color(config.hurtBoxColor, true),
+                new Color(hitboxType == null ? config.eyeColor : hitboxType.eyeColor, true),
+                new Color(hitboxType == null ? config.lookColor : hitboxType.lookColor, true),
+                new Color(hitboxType == null ? config.hitBoxColor : hitboxType.baseColor, true),
+                new Color(hitboxType == null ? config.targetBoxColor : hitboxType.targetColor, true),
+                new Color(hitboxType == null ? config.hurtBoxColor : hitboxType.hurtColor, true),
                 new Color(config.outlineColor, true),
                 config.changeTargetColor,
                 config.hitBoxHurt,

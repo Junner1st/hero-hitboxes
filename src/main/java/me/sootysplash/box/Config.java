@@ -9,10 +9,12 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.fabricmc.loader.api.FabricLoader;
 
-import java.awt.*;
+import java.awt.Color;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Config {
 
@@ -42,8 +44,10 @@ public class Config {
     public boolean outlineEnabled = false;
     public int outlineColor = Color.BLACK.getRGB();
     public float outlineMultiplier = 2;
+    public List<HitboxType> hitboxTypes = new ArrayList<>();
 
     public void save() {
+        ensureHitboxTypes();
         try {
             Files.writeString(file, GSON.toJson(this));
         } catch (IOException e) {
@@ -60,9 +64,101 @@ public class Config {
                 Main.LOGGER.warn("CombatHitboxes couldn't load the config, using defaults.");
                 instance = new Config();
             }
+            instance.ensureHitboxTypes();
         }
 
         return instance;
     }
 
+    public HitboxType getHitboxType(String entityId) {
+        ensureHitboxTypes();
+        if (entityId == null || entityId.isBlank()) {
+            return null;
+        }
+
+        for (HitboxType hitboxType : hitboxTypes) {
+            if (hitboxType != null && hitboxType.enabled && entityId.equals(hitboxType.normalizedId())) {
+                return hitboxType;
+            }
+        }
+
+        return null;
+    }
+
+    public void addHitboxType(String id, int baseColor, int eyeColor, int lookColor, int targetColor, int hurtColor) {
+        ensureHitboxTypes();
+        hitboxTypes.add(new HitboxType(id, baseColor, eyeColor, lookColor, targetColor, hurtColor));
+    }
+
+    public void ensureHitboxTypes() {
+        if (hitboxTypes == null) {
+            hitboxTypes = new ArrayList<>();
+        }
+        for (HitboxType hitboxType : hitboxTypes) {
+            if (hitboxType != null) {
+                hitboxType.ensureColors(this);
+            }
+        }
+    }
+
+    public static class HitboxType {
+        public String id;
+        public Integer baseColor;
+        public Integer eyeColor;
+        public Integer lookColor;
+        public Integer targetColor;
+        public Integer hurtColor;
+        public boolean enabled;
+
+        public HitboxType() {
+            this(
+                    "minecraft:zombie",
+                    Color.WHITE.getRGB(),
+                    Color.RED.getRGB(),
+                    Color.BLUE.getRGB(),
+                    Color.RED.getRGB(),
+                    Color.MAGENTA.getRGB()
+            );
+        }
+
+        public HitboxType(String id, int baseColor, int eyeColor, int lookColor, int targetColor, int hurtColor) {
+            this.id = id;
+            this.baseColor = baseColor;
+            this.eyeColor = eyeColor;
+            this.lookColor = lookColor;
+            this.targetColor = targetColor;
+            this.hurtColor = hurtColor;
+            this.enabled = true;
+        }
+
+        public void ensureColors(Config config) {
+            if (baseColor == null) {
+                baseColor = config.hitBoxColor;
+            }
+            if (eyeColor == null) {
+                eyeColor = config.eyeColor;
+            }
+            if (lookColor == null) {
+                lookColor = config.lookColor;
+            }
+            if (targetColor == null) {
+                targetColor = config.targetBoxColor;
+            }
+            if (hurtColor == null) {
+                hurtColor = config.hurtBoxColor;
+            }
+        }
+
+        public String normalizedId() {
+            return normalizeId(id);
+        }
+
+        public static String normalizeId(String value) {
+            if (value == null) {
+                return "";
+            }
+            String trimmed = value.trim().toLowerCase();
+            return trimmed.contains(":") ? trimmed : "minecraft:" + trimmed;
+        }
+    }
 }
