@@ -169,7 +169,7 @@ public class ModMenu implements ModMenuApi {
                         continue;
                     }
 
-                    hitboxTypes.addEntry(cfgent.startTextDescription(Component.nullToEmpty(hitboxType.normalizedId()))
+                    hitboxTypes.addEntry(cfgent.startTextDescription(Component.nullToEmpty(hitboxTypeHeader(hitboxType.normalizedId())))
                             .build());
 
                     hitboxTypes.addEntry(cfgent.startBooleanToggle(Component.nullToEmpty("Enabled"), hitboxType.enabled)
@@ -221,9 +221,6 @@ public class ModMenu implements ModMenuApi {
                                     pendingDeletedHitboxTypes.add(hitboxType);
                                 }
                             })
-                            .build());
-
-                    hitboxTypes.addEntry(cfgent.startTextDescription(Component.nullToEmpty("------------------------------"))
                             .build());
                 }
             }
@@ -370,6 +367,35 @@ public class ModMenu implements ModMenuApi {
         pendingDefaultLookColor = pendingLookColor;
         pendingDefaultTargetColor = pendingTargetColor;
         pendingDefaultHurtColor = pendingHurtColor;
+    }
+
+    private static String hitboxTypeHeader(String id) {
+        return "§6── §r" + displayNameFromId(id) + " §6──";
+    }
+
+    private static String displayNameFromId(String id) {
+        String value = Config.HitboxType.normalizeId(id);
+        int namespaceSeparator = value.indexOf(':');
+        if (namespaceSeparator >= 0 && namespaceSeparator + 1 < value.length()) {
+            value = value.substring(namespaceSeparator + 1);
+        }
+
+        String[] words = value.split("_+");
+        StringBuilder displayName = new StringBuilder();
+        for (String word : words) {
+            if (word.isBlank()) {
+                continue;
+            }
+            if (!displayName.isEmpty()) {
+                displayName.append(' ');
+            }
+            displayName.append(Character.toUpperCase(word.charAt(0)));
+            if (word.length() > 1) {
+                displayName.append(word.substring(1).toLowerCase());
+            }
+        }
+
+        return displayName.isEmpty() ? value : displayName.toString();
     }
 
     private static void removeSearchField(Screen screen) {
