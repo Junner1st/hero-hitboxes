@@ -18,6 +18,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
 import java.awt.Color;
+import java.util.ArrayList;
 import java.util.List;
 
 public class ModMenu implements ModMenuApi {
@@ -34,6 +35,7 @@ public class ModMenu implements ModMenuApi {
     private int pendingDefaultLookColor = Color.BLUE.getRGB();
     private int pendingDefaultTargetColor = Color.RED.getRGB();
     private int pendingDefaultHurtColor = Color.MAGENTA.getRGB();
+    private final List<Config.HitboxType> pendingDeletedHitboxTypes = new ArrayList<>();
 
     @Override
     public ConfigScreenFactory<?> getModConfigScreenFactory() {
@@ -47,6 +49,7 @@ public class ModMenu implements ModMenuApi {
                     .setParentScreen(parent)
                     .setTitle(Component.nullToEmpty("Config"))
                     .setSavingRunnable(() -> {
+                        removePendingDeletedHitboxTypes(config);
                         addPendingHitboxType(config);
                         config.save();
                         Minecraft.getInstance().execute(() -> Minecraft.getInstance().setScreen(getModConfigScreenFactory().create(parent)));
@@ -210,6 +213,16 @@ public class ModMenu implements ModMenuApi {
                             .setSaveConsumer(newValue -> hitboxType.hurtColor = newValue)
                             .build());
 
+                    hitboxTypes.addEntry(cfgent.startBooleanToggle(Component.nullToEmpty("Delete"), false)
+                            .setDefaultValue(false)
+                            .setTooltip(Component.nullToEmpty("Remove this hitbox type when saving"))
+                            .setSaveConsumer(newValue -> {
+                                if (newValue) {
+                                    pendingDeletedHitboxTypes.add(hitboxType);
+                                }
+                            })
+                            .build());
+
                     hitboxTypes.addEntry(cfgent.startTextDescription(Component.nullToEmpty("------------------------------"))
                             .build());
                 }
@@ -325,6 +338,15 @@ public class ModMenu implements ModMenuApi {
                 pendingHurtColor
         );
         resetPendingHitboxType(config);
+    }
+
+    private void removePendingDeletedHitboxTypes(Config config) {
+        if (pendingDeletedHitboxTypes.isEmpty()) {
+            return;
+        }
+
+        config.hitboxTypes.removeAll(pendingDeletedHitboxTypes);
+        pendingDeletedHitboxTypes.clear();
     }
 
     private boolean hasPendingChanges() {
