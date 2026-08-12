@@ -38,6 +38,8 @@ public class ModMenu implements ModMenuApi {
         private int contentY;
         private int scrollOffset;
         private String typeSearch = "";
+        private boolean refocusSearchAfterRebuild;
+        private int searchCursorPosition;
         private final Set<String> expandedTypeIds = new HashSet<>();
 
         private String pendingId = DEFAULT_NEW_ID;
@@ -146,10 +148,7 @@ public class ModMenu implements ModMenuApi {
             });
 
             contentY += 8;
-            addTextRow("Search", typeSearch, value -> {
-                typeSearch = value;
-                initGui();
-            });
+            addSearchRow();
 
             config.ensureHitboxTypes();
             int visibleTypes = 0;
@@ -249,6 +248,21 @@ public class ModMenu implements ModMenuApi {
             GuiTextFieldGeneric field = new GuiTextFieldGeneric(176, y, 180, 20, font);
             field.setValueWrapper(value);
             addTextField(field, new ChangeListener(consumer));
+        }
+
+        private void addSearchRow() {
+            int y = nextY();
+            addLabel(16, y + 6, 150, 12, 0xFFFFFFFF, "Search");
+            GuiTextFieldGeneric field = new GuiTextFieldGeneric(176, y, 180, 20, font);
+            field.setValueWrapper(typeSearch);
+            addTextField(field, new SearchChangeListener());
+
+            if (refocusSearchAfterRebuild) {
+                refocusSearchAfterRebuild = false;
+                field.setFocusedWrapper(true);
+                field.setCursorPosition(Math.min(searchCursorPosition, typeSearch.length()));
+                setFocused(field);
+            }
         }
 
         private void addFloatRow(String label, float value, float min, float max, Consumer<Float> consumer) {
@@ -380,6 +394,17 @@ public class ModMenu implements ModMenuApi {
             @Override
             public boolean onTextChange(GuiTextFieldGeneric textField) {
                 consumer.accept(textField.getValueWrapper());
+                return true;
+            }
+        }
+
+        private class SearchChangeListener implements ITextFieldListener<GuiTextFieldGeneric> {
+            @Override
+            public boolean onTextChange(GuiTextFieldGeneric textField) {
+                typeSearch = textField.getValueWrapper();
+                searchCursorPosition = textField.getCursorPosition();
+                refocusSearchAfterRebuild = true;
+                initGui();
                 return true;
             }
         }
