@@ -9,9 +9,11 @@ import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;
 import io.wispforest.owo.ui.base.BaseOwoScreen;
 import io.wispforest.owo.ui.component.ColorPickerComponent;
+import io.wispforest.owo.ui.component.BoxComponent;
 import io.wispforest.owo.ui.component.SmallCheckboxComponent;
 import io.wispforest.owo.ui.component.TextBoxComponent;
 import io.wispforest.owo.ui.component.UIComponents;
+import io.wispforest.owo.ui.container.CollapsibleContainer;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.container.ScrollContainer;
 import io.wispforest.owo.ui.container.UIContainers;
@@ -28,6 +30,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
 import java.util.Locale;
+import java.util.ArrayList;
 import java.util.function.Consumer;
 
 public class ModMenu implements ModMenuApi {
@@ -42,6 +45,7 @@ public class ModMenu implements ModMenuApi {
         private final Screen parent;
         private final Config config = Config.getInstance();
         private Tab selectedTab;
+        private String typeSearch = "";
 
         private String pendingId = DEFAULT_NEW_ID;
         private int pendingBaseColor;
@@ -55,9 +59,14 @@ public class ModMenu implements ModMenuApi {
         }
 
         private OwoConfigScreen(Screen parent, Tab selectedTab) {
+            this(parent, selectedTab, "");
+        }
+
+        private OwoConfigScreen(Screen parent, Tab selectedTab, String typeSearch) {
             super(Component.nullToEmpty("Hero Hitboxes Config"));
             this.parent = parent;
             this.selectedTab = selectedTab;
+            this.typeSearch = typeSearch;
             resetPendingHitboxType();
         }
 
@@ -148,41 +157,81 @@ public class ModMenu implements ModMenuApi {
         private void buildHitboxTypes(FlowLayout content) {
             config.ensureHitboxTypes();
 
-            content.child(section("Add Hitbox Type"));
-            content.child(textRow("Entity ID", pendingId, "Example: minecraft:zombie, minecraft:player, minecraft:item", value -> pendingId = Config.HitboxType.normalizeId(value)));
-            content.child(colorRow("Base Color", "Color used for this entity type's normal hitbox", pendingBaseColor, value -> pendingBaseColor = value));
-            content.child(colorRow("Eye Color", "Color used for this entity type's eye height", pendingEyeColor, value -> pendingEyeColor = value));
-            content.child(colorRow("Look Direction Color", "Color used for this entity type's look direction", pendingLookColor, value -> pendingLookColor = value));
-            content.child(colorRow("Target Color", "Color used when this entity type is targeted", pendingTargetColor, value -> pendingTargetColor = value));
-            content.child(colorRow("Hurt Color", "Color used when this entity type is on hurt tick", pendingHurtColor, value -> pendingHurtColor = value));
-            content.child(UIComponents.button(Component.nullToEmpty("Add Hitbox Type"), button -> {
-                addPendingHitboxType();
-                Minecraft.getInstance().setScreen(new OwoConfigScreen(parent, Tab.HITBOX_TYPES));
-            }));
-
-            content.child(section("Hitbox Types"));
-            if (config.hitboxTypes.isEmpty()) {
-                content.child(UIComponents.label(Component.nullToEmpty("No custom hitbox types yet."))
-                        .color(Color.ofRgb(0xA0A0A0)));
-                return;
-            }
-
-            for (Config.HitboxType hitboxType : config.hitboxTypes) {
-                if (hitboxType == null) {
-                    continue;
-                }
-                content.child(hitboxTypeBlock(hitboxType));
-            }
+            content.child(addHitboxTypeBlock());
+            content.child(typeSearchRow(content));
+            rebuildHitboxTypeList(content, typeSearch);
         }
 
-        private FlowLayout hitboxTypeBlock(Config.HitboxType hitboxType) {
-            FlowLayout block = UIContainers.verticalFlow(Sizing.fill(), Sizing.content());
-            block.surface(Surface.PANEL);
-            block.padding(Insets.of(6));
+        private CollapsibleContainer addHitboxTypeBlock() {
+            CollapsibleContainer block = UIContainers.collapsible(Sizing.fill(), Sizing.content(), Component.nullToEmpty("Add Hitbox Type"), true);
             block.gap(4);
-            block.child(UIComponents.label(Component.nullToEmpty(displayNameFromId(hitboxType.normalizedId())))
-                    .shadow(true)
-                    .color(Color.ofRgb(0xFFD37A)));
+            block.padding(Insets.of(6));
+            block.titleLayout().child(colorSwatch(pendingBaseColor));
+            block.child(textRow("Entity ID", pendingId, "Example: minecraft:zombie, minecraft:player, minecraft:item", value -> pendingId = Config.HitboxType.normalizeId(value)));
+            block.child(colorRow("Base Color", "Color used for this entity type's normal hitbox", pendingBaseColor, value -> pendingBaseColor = value));
+            block.child(colorRow("Eye Color", "Color used for this entity type's eye height", pendingEyeColor, value -> pendingEyeColor = value));
+            block.child(colorRow("Look Direction Color", "Color used for this entity type's look direction", pendingLookColor, value -> pendingLookColor = value));
+            block.child(colorRow("Target Color", "Color used when this entity type is targeted", pendingTargetColor, value -> pendingTargetColor = value));
+            block.child(colorRow("Hurt Color", "Color used when this entity type is on hurt tick", pendingHurtColor, value -> pendingHurtColor = value));
+            block.child(UIComponents.button(Component.nullToEmpty("Add Hitbox Type"), button -> {
+                addPendingHitboxType();
+                Minecraft.getInstance().setScreen(new OwoConfigScreen(parent, Tab.HITBOX_TYPES, typeSearch));
+            }));
+            return block;
+        }
+
+        private FlowLayout typeSearchRow(FlowLayout content) {
+            FlowLayout layout = labeledRow("Search");
+            TextBoxComponent searchBox = UIComponents.textBox(Sizing.fixed(180), typeSearch);
+            searchBox.onChanged().subscribe(value -> {
+                typeSearch = value;
+                rebuildHitboxTypeList(content, value);
+            });
+            layout.child(searchBox);
+            return layout;
+        }
+
+        private void rebuildHitboxTypeList(FlowLayout content, String search) {
+            for (var component : new ArrayList<>(content.children())) {
+                if ("hitbox-type-list".equals(component.id())) {
+                    content.removeChild(component);
+                }
+            }
+
+            FlowLayout list = UIContainers.verticalFlow(Sizing.fill(), Sizing.content());
+            list.id("hitbox-type-list");
+            list.gap(6);
+
+            String normalizedSearch = normalizeSearch(search);
+            int visibleTypes = 0;
+            for (Config.HitboxType hitboxType : config.hitboxTypes) {
+                if (hitboxType == null || !matchesTypeSearch(hitboxType, normalizedSearch)) {
+                    continue;
+                }
+                list.child(hitboxTypeBlock(hitboxType));
+                visibleTypes++;
+            }
+
+            if (visibleTypes == 0) {
+                String message = config.hitboxTypes.isEmpty()
+                        ? "No custom hitbox types yet."
+                        : "No hitbox types match the current search.";
+                list.child(UIComponents.label(Component.nullToEmpty(message)).color(Color.ofRgb(0xA0A0A0)));
+            }
+
+            content.child(list);
+        }
+
+        private CollapsibleContainer hitboxTypeBlock(Config.HitboxType hitboxType) {
+            CollapsibleContainer block = UIContainers.collapsible(
+                    Sizing.fill(),
+                    Sizing.content(),
+                    Component.nullToEmpty(displayNameFromId(hitboxType.normalizedId())),
+                    false
+            );
+            block.gap(4);
+            block.padding(Insets.of(6));
+            block.titleLayout().child(colorSwatch(hitboxType.baseColor));
             block.child(toggleRow("Enabled", "", hitboxType.enabled, value -> hitboxType.enabled = value));
             block.child(textRow("Entity ID", hitboxType.normalizedId(), "Example: minecraft:zombie, minecraft:player, minecraft:item", value -> hitboxType.id = Config.HitboxType.normalizeId(value)));
             block.child(colorRow("Base Color", "Color used for this entity type's normal hitbox", hitboxType.baseColor, value -> hitboxType.baseColor = value));
@@ -195,6 +244,14 @@ public class ModMenu implements ModMenuApi {
                 Minecraft.getInstance().setScreen(new OwoConfigScreen(parent, Tab.HITBOX_TYPES));
             }));
             return block;
+        }
+
+        private BoxComponent colorSwatch(int color) {
+            BoxComponent swatch = UIComponents.box(Sizing.fixed(18), Sizing.fixed(10));
+            swatch.fill(true);
+            swatch.color(Color.ofArgb(color));
+            swatch.margins(Insets.left(6));
+            return swatch;
         }
 
         private void buildLineWidth(FlowLayout content) {
@@ -323,6 +380,18 @@ public class ModMenu implements ModMenuApi {
                 value = value.substring(namespaceSeparator + 1);
             }
             return value.replace('_', ' ');
+        }
+
+        private static boolean matchesTypeSearch(Config.HitboxType hitboxType, String search) {
+            if (search.isBlank()) {
+                return true;
+            }
+
+            return displayNameFromId(hitboxType.normalizedId()).toLowerCase(Locale.ROOT).contains(search);
+        }
+
+        private static String normalizeSearch(String search) {
+            return search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
         }
 
         private static float clamp(float value, float min, float max) {
