@@ -7,6 +7,7 @@ package me.sootysplash.box;
 
 import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;
+import com.mojang.blaze3d.platform.InputConstants;
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.GuiTextFieldGeneric;
 import fi.dy.masa.malilib.gui.button.ButtonGeneric;
@@ -16,6 +17,7 @@ import fi.dy.masa.malilib.gui.wrappers.TextFieldType;
 import fi.dy.masa.malilib.util.data.Color4f;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.gui.screens.Screen;
 
 import java.util.HashSet;
@@ -51,6 +53,19 @@ public class ModMenu implements ModMenuApi {
         return MalilibConfigScreen::new;
     }
 
+    public static void openColorsConfigScreen() {
+        openConfigScreen(MalilibConfigScreen.Tab.COLORS);
+    }
+
+    public static void openHitboxTypesConfigScreen() {
+        openConfigScreen(MalilibConfigScreen.Tab.HITBOX_TYPES);
+    }
+
+    private static void openConfigScreen(MalilibConfigScreen.Tab tab) {
+        Minecraft client = Minecraft.getInstance();
+        client.setScreen(new MalilibConfigScreen(client.screen, tab));
+    }
+
     private static class MalilibConfigScreen extends GuiBase {
         private final Screen parent;
         private final Config config = Config.getInstance();
@@ -60,6 +75,8 @@ public class ModMenu implements ModMenuApi {
         private String typeSearch = "";
         private boolean refocusSearchAfterRebuild;
         private int searchCursorPosition;
+        private String activeKeybindLabel;
+        private Consumer<Integer> activeKeybindConsumer;
         private final Set<String> expandedTypeIds = new HashSet<>();
         private final Set<Config.HitboxType> pendingDeletedHitboxTypes = new HashSet<>();
 
@@ -105,6 +122,7 @@ public class ModMenu implements ModMenuApi {
                 case BEHAVIOR -> buildBehavior();
                 case COLORS -> buildColors();
                 case HITBOX_TYPES -> buildHitboxTypes();
+                case KEYBINDS -> buildKeybinds();
                 case LINE_WIDTH -> buildLineWidth();
                 case OUTLINE -> buildOutline();
             }
@@ -119,6 +137,22 @@ public class ModMenu implements ModMenuApi {
                 return true;
             }
             return super.onMouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+        }
+
+        @Override
+        public boolean onKeyTyped(KeyEvent event) {
+            if (activeKeybindConsumer != null) {
+                if (event.key() != InputConstants.KEY_ESCAPE) {
+                    activeKeybindConsumer.accept(event.key());
+                    HeroHitboxesKeybinds.updateFromConfig();
+                }
+                activeKeybindLabel = null;
+                activeKeybindConsumer = null;
+                initGui();
+                return true;
+            }
+
+            return super.onKeyTyped(event);
         }
 
         private void buildBehavior() {
@@ -139,6 +173,11 @@ public class ModMenu implements ModMenuApi {
             addColorRow("Look Direction Color", config.lookColor, value -> config.lookColor = value);
             addColorRow("Target Color", config.targetBoxColor, value -> config.targetBoxColor = value);
             addColorRow("Hurt Color", config.hurtBoxColor, value -> config.hurtBoxColor = value);
+        }
+
+        private void buildKeybinds() {
+            addKeybindRow("Open Colors Config", config.openColorsConfigKey, value -> config.openColorsConfigKey = value);
+            addKeybindRow("Open Hitbox Types Config", config.openHitboxTypesConfigKey, value -> config.openHitboxTypesConfigKey = value);
         }
 
         private void buildHitboxTypes() {
@@ -238,6 +277,17 @@ public class ModMenu implements ModMenuApi {
             });
         }
 
+        private void addKeybindRow(String label, int keyCode, Consumer<Integer> consumer) {
+            int y = nextY();
+            addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, label);
+            String buttonLabel = label.equals(activeKeybindLabel) ? "Press key..." : keyDisplayName(keyCode);
+            addButton(new ButtonGeneric(CONTROL_X, y, TEXT_FIELD_WIDTH, BUTTON_HEIGHT, buttonLabel), (button, mouseButton) -> {
+                activeKeybindLabel = label;
+                activeKeybindConsumer = consumer;
+                initGui();
+            });
+        }
+
         private void addTextRow(String label, String value, Consumer<String> consumer) {
             int y = nextY();
             addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, label);
@@ -315,6 +365,10 @@ public class ModMenu implements ModMenuApi {
             return String.format(Locale.ROOT, "#%08X", color);
         }
 
+        private static String keyDisplayName(int keyCode) {
+            return InputConstants.Type.KEYSYM.getOrCreate(keyCode).getDisplayName().getString();
+        }
+
         private static String displayNameFromId(String id) {
             String value = Config.HitboxType.normalizeId(id);
             int namespaceSeparator = value.indexOf(':');
@@ -359,6 +413,7 @@ public class ModMenu implements ModMenuApi {
             BEHAVIOR("Behavior"),
             COLORS("Colors"),
             HITBOX_TYPES("Hitbox Types"),
+            KEYBINDS("Keybinds"),
             LINE_WIDTH("Line Width"),
             OUTLINE("Outline");
 

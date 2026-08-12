@@ -22,6 +22,8 @@ public class Config {
 
     private static final Path file = FabricLoader.getInstance().getConfigDir().resolve("hero-hitboxes.json");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final int DEFAULT_OPEN_COLORS_CONFIG_KEY = 295;
+    private static final int DEFAULT_OPEN_HITBOX_TYPES_CONFIG_KEY = 296;
     private static Config instance;
 
     public boolean enabled = true;
@@ -45,9 +47,11 @@ public class Config {
     public int outlineColor = Color.BLACK.getRGB();
     public float outlineMultiplier = 2;
     public List<HitboxType> hitboxTypes = new ArrayList<>();
+    public int openColorsConfigKey = DEFAULT_OPEN_COLORS_CONFIG_KEY;
+    public int openHitboxTypesConfigKey = DEFAULT_OPEN_HITBOX_TYPES_CONFIG_KEY;
 
     public void save() {
-        ensureHitboxTypes();
+        ensureDefaults();
         try {
             Files.writeString(file, GSON.toJson(this));
         } catch (IOException e) {
@@ -64,7 +68,7 @@ public class Config {
                 Main.LOGGER.warn("CombatHitboxes couldn't load the config, using defaults.");
                 instance = new Config();
             }
-            instance.ensureHitboxTypes();
+            instance.ensureDefaults();
         }
 
         return instance;
@@ -98,6 +102,16 @@ public class Config {
             if (hitboxType != null) {
                 hitboxType.ensureColors(this);
             }
+        }
+    }
+
+    public void ensureDefaults() {
+        ensureHitboxTypes();
+        if (openColorsConfigKey == 0) {
+            openColorsConfigKey = DEFAULT_OPEN_COLORS_CONFIG_KEY;
+        }
+        if (openHitboxTypesConfigKey == 0) {
+            openHitboxTypesConfigKey = DEFAULT_OPEN_HITBOX_TYPES_CONFIG_KEY;
         }
     }
 
