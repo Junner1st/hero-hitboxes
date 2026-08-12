@@ -204,8 +204,7 @@ public class ModMenu implements ModMenuApi {
             GuiTextFieldGeneric field = new GuiTextFieldGeneric(CONTROL_X, y, TEXT_FIELD_WIDTH, BUTTON_HEIGHT, font);
             field.setValueWrapper(hitboxType.normalizedId());
             field.setMaxLengthWrapper(TEXT_FIELD_MAX_LENGTH);
-            addTextField(field, new ChangeListener(value -> hitboxType.id = value), TextFieldType.BLOCK_ID);
-            addButton(new ButtonGeneric(CONTROL_X + TEXT_FIELD_WIDTH + 8, y, DELETE_BUTTON_WIDTH, BUTTON_HEIGHT, "Delete"), (button, mouseButton) -> deleteHitboxType(hitboxType));
+            addTextField(field, new ChangeListener(value -> hitboxType.id = value), TextFieldType.STRING);
         }
 
         private void deleteHitboxType(Config.HitboxType hitboxType) {
@@ -283,9 +282,9 @@ public class ModMenu implements ModMenuApi {
             addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, label);
             addWidget(new ColorPreviewWidget(CONTROL_X, y + 2, value));
             GuiTextFieldGeneric field = new GuiTextFieldGeneric(COLOR_FIELD_X, y, COLOR_FIELD_WIDTH, BUTTON_HEIGHT, font);
-            field.setMaxLengthWrapper(COLOR_FIELD_MAX_LENGTH);
             field.setValueWrapper(hexColor(value));
-            addTextField(field, new ChangeListener(text -> parseHexColor(text, value, consumer)), TextFieldType.VALID_STRING.setMaxLength(COLOR_FIELD_MAX_LENGTH));
+            addTextField(field, new ChangeListener(text -> parseHexColor(text, value, consumer)), TextFieldType.STRING);
+            field.setMaxLengthWrapper(COLOR_FIELD_MAX_LENGTH);
         }
 
         private int nextY() {
@@ -456,7 +455,7 @@ public class ModMenu implements ModMenuApi {
             GuiTextFieldGeneric field = new GuiTextFieldGeneric(CONTROL_X, y, TEXT_FIELD_WIDTH, BUTTON_HEIGHT, font);
             field.setValueWrapper(id);
             field.setMaxLengthWrapper(TEXT_FIELD_MAX_LENGTH);
-            addTextField(field, new ChangeListener(value -> id = value), TextFieldType.BLOCK_ID);
+            addTextField(field, new ChangeListener(value -> id = value), TextFieldType.STRING);
         }
 
         private void addColorRow(String label, int value, Consumer<Integer> consumer) {
@@ -464,9 +463,9 @@ public class ModMenu implements ModMenuApi {
             addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, label);
             addWidget(new ColorPreviewWidget(CONTROL_X, y + 2, value));
             GuiTextFieldGeneric field = new GuiTextFieldGeneric(COLOR_FIELD_X, y, COLOR_FIELD_WIDTH, BUTTON_HEIGHT, font);
-            field.setMaxLengthWrapper(COLOR_FIELD_MAX_LENGTH);
             field.setValueWrapper(MalilibConfigScreen.hexColor(value));
-            addTextField(field, new ChangeListener(text -> MalilibConfigScreen.parseHexColor(text, value, consumer)), TextFieldType.VALID_STRING.setMaxLength(COLOR_FIELD_MAX_LENGTH));
+            addTextField(field, new ChangeListener(text -> MalilibConfigScreen.parseHexColor(text, value, consumer)), TextFieldType.STRING);
+            field.setMaxLengthWrapper(COLOR_FIELD_MAX_LENGTH);
         }
 
         private int nextY() {
