@@ -11,6 +11,7 @@ import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.GuiTextFieldGeneric;
 import fi.dy.masa.malilib.gui.button.ButtonGeneric;
 import fi.dy.masa.malilib.gui.interfaces.ITextFieldListener;
+import fi.dy.masa.malilib.gui.wrappers.TextFieldType;
 import fi.dy.masa.malilib.render.RenderUtils;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
@@ -41,6 +42,8 @@ public class ModMenu implements ModMenuApi {
     private static final int SMALL_BUTTON_WIDTH = 60;
     private static final int DELETE_BUTTON_WIDTH = 58;
     private static final int ADD_TYPE_BUTTON_WIDTH = 118;
+    private static final int TEXT_FIELD_MAX_LENGTH = 256;
+    private static final int COLOR_FIELD_MAX_LENGTH = 8;
 
     @Override
     public ConfigScreenFactory<?> getModConfigScreenFactory() {
@@ -200,7 +203,8 @@ public class ModMenu implements ModMenuApi {
             addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, "Entity ID");
             GuiTextFieldGeneric field = new GuiTextFieldGeneric(CONTROL_X, y, TEXT_FIELD_WIDTH, BUTTON_HEIGHT, font);
             field.setValueWrapper(hitboxType.normalizedId());
-            addTextField(field, new ChangeListener(value -> hitboxType.id = Config.HitboxType.normalizeId(value)));
+            field.setMaxLengthWrapper(TEXT_FIELD_MAX_LENGTH);
+            addTextField(field, new ChangeListener(value -> hitboxType.id = value), TextFieldType.BLOCK_ID);
             addButton(new ButtonGeneric(CONTROL_X + TEXT_FIELD_WIDTH + 8, y, DELETE_BUTTON_WIDTH, BUTTON_HEIGHT, "Delete"), (button, mouseButton) -> deleteHitboxType(hitboxType));
         }
 
@@ -236,7 +240,8 @@ public class ModMenu implements ModMenuApi {
             addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, label);
             GuiTextFieldGeneric field = new GuiTextFieldGeneric(CONTROL_X, y, TEXT_FIELD_WIDTH, BUTTON_HEIGHT, font);
             field.setValueWrapper(value);
-            addTextField(field, new ChangeListener(consumer));
+            field.setMaxLengthWrapper(TEXT_FIELD_MAX_LENGTH);
+            addTextField(field, new ChangeListener(consumer), TextFieldType.STRING);
         }
 
         private void addSearchRow() {
@@ -244,7 +249,8 @@ public class ModMenu implements ModMenuApi {
             addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, "Search");
             GuiTextFieldGeneric field = new GuiTextFieldGeneric(CONTROL_X, y, TEXT_FIELD_WIDTH, BUTTON_HEIGHT, font);
             field.setValueWrapper(typeSearch);
-            addTextField(field, new SearchChangeListener());
+            field.setMaxLengthWrapper(TEXT_FIELD_MAX_LENGTH);
+            addTextField(field, new SearchChangeListener(), TextFieldType.STRING);
 
             if (refocusSearchAfterRebuild) {
                 refocusSearchAfterRebuild = false;
@@ -277,9 +283,9 @@ public class ModMenu implements ModMenuApi {
             addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, label);
             addWidget(new ColorPreviewWidget(CONTROL_X, y + 2, value));
             GuiTextFieldGeneric field = new GuiTextFieldGeneric(COLOR_FIELD_X, y, COLOR_FIELD_WIDTH, BUTTON_HEIGHT, font);
-            field.setMaxLengthWrapper(8);
+            field.setMaxLengthWrapper(COLOR_FIELD_MAX_LENGTH);
             field.setValueWrapper(hexColor(value));
-            addTextField(field, new ChangeListener(text -> parseHexColor(text, value, consumer)));
+            addTextField(field, new ChangeListener(text -> parseHexColor(text, value, consumer)), TextFieldType.VALID_STRING.setMaxLength(COLOR_FIELD_MAX_LENGTH));
         }
 
         private int nextY() {
@@ -417,7 +423,7 @@ public class ModMenu implements ModMenuApi {
             });
 
             contentY = CONTENT_START_Y;
-            addTextRow("Entity ID", id, value -> id = Config.HitboxType.normalizeId(value));
+            addEntityIdRow();
             addColorRow("Base Color", baseColor, value -> baseColor = value);
             addColorRow("Eye Color", eyeColor, value -> eyeColor = value);
             addColorRow("Look Direction Color", lookColor, value -> lookColor = value);
@@ -440,7 +446,17 @@ public class ModMenu implements ModMenuApi {
             addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, label);
             GuiTextFieldGeneric field = new GuiTextFieldGeneric(CONTROL_X, y, TEXT_FIELD_WIDTH, BUTTON_HEIGHT, font);
             field.setValueWrapper(value);
-            addTextField(field, new ChangeListener(consumer));
+            field.setMaxLengthWrapper(TEXT_FIELD_MAX_LENGTH);
+            addTextField(field, new ChangeListener(consumer), TextFieldType.STRING);
+        }
+
+        private void addEntityIdRow() {
+            int y = nextY();
+            addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, "Entity ID");
+            GuiTextFieldGeneric field = new GuiTextFieldGeneric(CONTROL_X, y, TEXT_FIELD_WIDTH, BUTTON_HEIGHT, font);
+            field.setValueWrapper(id);
+            field.setMaxLengthWrapper(TEXT_FIELD_MAX_LENGTH);
+            addTextField(field, new ChangeListener(value -> id = value), TextFieldType.BLOCK_ID);
         }
 
         private void addColorRow(String label, int value, Consumer<Integer> consumer) {
@@ -448,9 +464,9 @@ public class ModMenu implements ModMenuApi {
             addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, label);
             addWidget(new ColorPreviewWidget(CONTROL_X, y + 2, value));
             GuiTextFieldGeneric field = new GuiTextFieldGeneric(COLOR_FIELD_X, y, COLOR_FIELD_WIDTH, BUTTON_HEIGHT, font);
-            field.setMaxLengthWrapper(8);
+            field.setMaxLengthWrapper(COLOR_FIELD_MAX_LENGTH);
             field.setValueWrapper(MalilibConfigScreen.hexColor(value));
-            addTextField(field, new ChangeListener(text -> MalilibConfigScreen.parseHexColor(text, value, consumer)));
+            addTextField(field, new ChangeListener(text -> MalilibConfigScreen.parseHexColor(text, value, consumer)), TextFieldType.VALID_STRING.setMaxLength(COLOR_FIELD_MAX_LENGTH));
         }
 
         private int nextY() {
