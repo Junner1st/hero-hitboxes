@@ -232,18 +232,31 @@ public class ModMenu implements ModMenuApi {
             block.gap(4);
             block.padding(Insets.of(6));
             block.titleLayout().child(colorSwatch(hitboxType.baseColor));
+            block.titleLayout().child(UIComponents.button(Component.nullToEmpty("Delete"), button -> deleteHitboxType(hitboxType)));
             block.child(toggleRow("Enabled", "", hitboxType.enabled, value -> hitboxType.enabled = value));
-            block.child(textRow("Entity ID", hitboxType.normalizedId(), "Example: minecraft:zombie, minecraft:player, minecraft:item", value -> hitboxType.id = Config.HitboxType.normalizeId(value)));
+            block.child(hitboxTypeIdRow(hitboxType));
             block.child(colorRow("Base Color", "Color used for this entity type's normal hitbox", hitboxType.baseColor, value -> hitboxType.baseColor = value));
             block.child(colorRow("Eye Color", "Color used for this entity type's eye height", hitboxType.eyeColor, value -> hitboxType.eyeColor = value));
             block.child(colorRow("Look Direction Color", "Color used for this entity type's look direction", hitboxType.lookColor, value -> hitboxType.lookColor = value));
             block.child(colorRow("Target Color", "Color used when this entity type is targeted", hitboxType.targetColor, value -> hitboxType.targetColor = value));
             block.child(colorRow("Hurt Color", "Color used when this entity type is on hurt tick", hitboxType.hurtColor, value -> hitboxType.hurtColor = value));
-            block.child(UIComponents.button(Component.nullToEmpty("Delete"), button -> {
-                config.hitboxTypes.remove(hitboxType);
-                Minecraft.getInstance().setScreen(new OwoConfigScreen(parent, Tab.HITBOX_TYPES));
-            }));
             return block;
+        }
+
+        private FlowLayout hitboxTypeIdRow(Config.HitboxType hitboxType) {
+            FlowLayout layout = labeledRow("Entity ID");
+            TextBoxComponent textBox = UIComponents.textBox(Sizing.fixed(180), hitboxType.normalizedId());
+            textBox.tooltip(Component.nullToEmpty("Example: minecraft:zombie, minecraft:player, minecraft:item"));
+            textBox.onChanged().subscribe(value -> hitboxType.id = Config.HitboxType.normalizeId(value));
+            layout.child(textBox);
+            layout.child(UIComponents.button(Component.nullToEmpty("Delete"), button -> deleteHitboxType(hitboxType))
+                    .tooltip(Component.nullToEmpty("Remove this hitbox type")));
+            return layout;
+        }
+
+        private void deleteHitboxType(Config.HitboxType hitboxType) {
+            config.hitboxTypes.remove(hitboxType);
+            Minecraft.getInstance().setScreen(new OwoConfigScreen(parent, Tab.HITBOX_TYPES, typeSearch));
         }
 
         private BoxComponent colorSwatch(int color) {
