@@ -26,6 +26,6 @@
 		"fabricloader": ">=0.14.9",
 		"minecraft": ">=26.1",
 		"java": ">=17",
-		"cloth-config": "*"
+		"malilib": "*"
 	}
 }

@@ -18,6 +18,7 @@ repositories {
 	// for more information about repositories.
 	maven { url "https://maven.shedaniel.me/" }
 	maven { url "https://maven.terraformersmc.com/releases/" }
+	maven { url "https://api.modrinth.com/maven" }
 }
 
 dependencies {
@@ -30,9 +31,7 @@ dependencies {
 
 	api("com.terraformersmc:modmenu:${project.modmenu_version}")
 
-    api ("me.shedaniel.cloth:cloth-config-fabric:${project.cloth_config_version}") {
-		exclude(group: "net.fabricmc.fabric-api")
-	}
+    api "maven.modrinth:malilib:${project.malilib_version}"
 }
 
 processResources {

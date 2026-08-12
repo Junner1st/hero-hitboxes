@@ -7,417 +7,334 @@ package me.sootysplash.box;
 
 import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;
-import me.shedaniel.clothconfig2.api.ConfigBuilder;
-import me.shedaniel.clothconfig2.api.ConfigCategory;
-import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
-import me.shedaniel.clothconfig2.gui.ClothConfigScreen;
-import me.shedaniel.clothconfig2.gui.entries.EmptyEntry;
-import me.shedaniel.clothconfig2.gui.widget.SearchFieldEntry;
+import fi.dy.masa.malilib.gui.GuiBase;
+import fi.dy.masa.malilib.gui.GuiTextFieldGeneric;
+import fi.dy.masa.malilib.gui.button.ButtonBase;
+import fi.dy.masa.malilib.gui.button.ButtonGeneric;
+import fi.dy.masa.malilib.gui.interfaces.ITextFieldListener;
+import fi.dy.masa.malilib.render.GuiContext;
+import fi.dy.masa.malilib.render.RenderUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.Component;
 
 import java.awt.Color;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Locale;
+import java.util.function.Consumer;
 
 public class ModMenu implements ModMenuApi {
     private static final String DEFAULT_NEW_ID = "minecraft:zombie";
 
-    private String pendingId = DEFAULT_NEW_ID;
-    private int pendingBaseColor = Color.WHITE.getRGB();
-    private int pendingEyeColor = Color.RED.getRGB();
-    private int pendingLookColor = Color.BLUE.getRGB();
-    private int pendingTargetColor = Color.RED.getRGB();
-    private int pendingHurtColor = Color.MAGENTA.getRGB();
-    private int pendingDefaultBaseColor = Color.WHITE.getRGB();
-    private int pendingDefaultEyeColor = Color.RED.getRGB();
-    private int pendingDefaultLookColor = Color.BLUE.getRGB();
-    private int pendingDefaultTargetColor = Color.RED.getRGB();
-    private int pendingDefaultHurtColor = Color.MAGENTA.getRGB();
-    private final List<Config.HitboxType> pendingDeletedHitboxTypes = new ArrayList<>();
-
     @Override
     public ConfigScreenFactory<?> getModConfigScreenFactory() {
-        return parent -> {
-            Config config = Config.getInstance();
-            if (!hasPendingChanges()) {
-                resetPendingHitboxType(config);
+        return MalilibConfigScreen::new;
+    }
+
+    private static class MalilibConfigScreen extends GuiBase {
+        private final Screen parent;
+        private final Config config = Config.getInstance();
+        private Tab selectedTab;
+        private int contentY;
+        private int scrollOffset;
+
+        private String pendingId = DEFAULT_NEW_ID;
+        private int pendingBaseColor;
+        private int pendingEyeColor;
+        private int pendingLookColor;
+        private int pendingTargetColor;
+        private int pendingHurtColor;
+
+        private MalilibConfigScreen(Screen parent) {
+            this(parent, Tab.BEHAVIOR);
+        }
+
+        private MalilibConfigScreen(Screen parent, Tab selectedTab) {
+            this.parent = parent;
+            this.selectedTab = selectedTab;
+            this.setParent(parent);
+            this.setTitle("Hero Hitboxes Config");
+            resetPendingHitboxType();
+        }
+
+        @Override
+        public void initGui() {
+            super.initGui();
+            clearElements();
+
+            int x = 16;
+            int y = 28;
+            for (Tab tab : Tab.values()) {
+                ButtonGeneric button = new ButtonGeneric(x, y, 104, 20, tab.label);
+                button.setEnabled(tab != selectedTab);
+                addButton(button, (pressedButton, mouseButton) -> {
+                    selectedTab = tab;
+                    scrollOffset = 0;
+                    initGui();
+                });
+                x += 108;
             }
 
-            ConfigBuilder builder = ConfigBuilder.create()
-                    .setParentScreen(parent)
-                    .setTitle(Component.nullToEmpty("Config"))
-                    .setSavingRunnable(() -> {
-                        removePendingDeletedHitboxTypes(config);
-                        addPendingHitboxType(config);
-                        config.save();
-                        Minecraft.getInstance().execute(() -> Minecraft.getInstance().setScreen(getModConfigScreenFactory().create(parent)));
-                    });
-            builder.setGlobalized(false);
-            builder.setAfterInitConsumer(ModMenu::removeSearchField);
+            addButton(new ButtonGeneric(width - 168, height - 28, 72, 20, "Save"), (button, mouseButton) -> {
+                config.save();
+                Minecraft.getInstance().setScreen(parent);
+            });
+            addButton(new ButtonGeneric(width - 88, height - 28, 72, 20, "Cancel"), (button, mouseButton) -> {
+                Minecraft.getInstance().setScreen(parent);
+            });
 
-            ConfigEntryBuilder cfgent = builder.entryBuilder();
-            ConfigCategory behavior = builder.getOrCreateCategory(Component.nullToEmpty("Behavior"));
+            contentY = 58 - scrollOffset;
+            switch (selectedTab) {
+                case BEHAVIOR -> buildBehavior();
+                case COLORS -> buildColors();
+                case HITBOX_TYPES -> buildHitboxTypes();
+                case LINE_WIDTH -> buildLineWidth();
+                case OUTLINE -> buildOutline();
+            }
+        }
 
+        @Override
+        public boolean onMouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+            int oldOffset = scrollOffset;
+            scrollOffset = Math.max(0, scrollOffset - (int) (verticalAmount * 18));
+            if (oldOffset != scrollOffset) {
+                initGui();
+                return true;
+            }
+            return super.onMouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+        }
 
-            behavior.addEntry(cfgent.startBooleanToggle(Component.nullToEmpty("Enabled"), config.enabled)
-                    .setDefaultValue(true)
-                    .setTooltip(Component.nullToEmpty("Modify hitbox rendering?"))
-                    .setSaveConsumer(newValue -> config.enabled = newValue)
-                    .build());
+        @Override
+        protected void drawContents(GuiContext context, int mouseX, int mouseY, float partialTicks) {
+            super.drawContents(context, mouseX, mouseY, partialTicks);
+            drawString(context, "Hero Hitboxes", 16, 10, 0xFFFFFFFF);
+        }
 
+        private void buildBehavior() {
+            addToggleRow("Enabled", config.enabled, value -> config.enabled = value);
+            addToggleRow("Render Eye Height", config.renderEyeHeight, value -> config.renderEyeHeight = value);
+            addToggleRow("Render Look Direction", config.renderLookDir, value -> config.renderLookDir = value);
+            addToggleRow("Target HitBox Color", config.changeTargetColor, value -> config.changeTargetColor = value);
+            addToggleRow("HitBox Hurt", config.hitBoxHurt, value -> config.hitBoxHurt = value);
+            addToggleRow("Line Look Direction", config.lineLookDir, value -> config.lineLookDir = value);
+            addToggleRow("Hide Stuck Arrows", config.hideArrow, value -> config.hideArrow = value);
+            addToggleRow("Skip Fireworks", config.hideFireworks, value -> config.hideFireworks = value);
+            addToggleRow("Skip Items", config.hideItems, value -> config.hideItems = value);
+        }
 
-            behavior.addEntry(cfgent.startBooleanToggle(Component.nullToEmpty("Render Eye Height"), config.renderEyeHeight)
-                    .setDefaultValue(true)
-                    .setTooltip(Component.nullToEmpty("Render the red line at the entity's eye height"))
-                    .setSaveConsumer(newValue -> config.renderEyeHeight = newValue)
-                    .build());
+        private void buildColors() {
+            addColorRow("Base Color", config.hitBoxColor, value -> config.hitBoxColor = value);
+            addColorRow("Eye Color", config.eyeColor, value -> config.eyeColor = value);
+            addColorRow("Look Direction Color", config.lookColor, value -> config.lookColor = value);
+            addColorRow("Target Color", config.targetBoxColor, value -> config.targetBoxColor = value);
+            addColorRow("Hurt Color", config.hurtBoxColor, value -> config.hurtBoxColor = value);
+        }
 
+        private void buildHitboxTypes() {
+            addSection("Add Hitbox Type");
+            addTextRow("Entity ID", pendingId, value -> pendingId = Config.HitboxType.normalizeId(value));
+            addColorRow("Base Color", pendingBaseColor, value -> pendingBaseColor = value);
+            addColorRow("Eye Color", pendingEyeColor, value -> pendingEyeColor = value);
+            addColorRow("Look Direction Color", pendingLookColor, value -> pendingLookColor = value);
+            addColorRow("Target Color", pendingTargetColor, value -> pendingTargetColor = value);
+            addColorRow("Hurt Color", pendingHurtColor, value -> pendingHurtColor = value);
+            addButton(new ButtonGeneric(176, nextY(), 136, 20, "Add Hitbox Type"), (button, mouseButton) -> {
+                addPendingHitboxType();
+                initGui();
+            });
 
-            behavior.addEntry(cfgent.startBooleanToggle(Component.nullToEmpty("Render Look Direction"), config.renderLookDir)
-                    .setDefaultValue(true)
-                    .setTooltip(Component.nullToEmpty("Render the blue line indicating the direction the entity is facing"))
-                    .setSaveConsumer(newValue -> config.renderLookDir = newValue)
-                    .build());
-
-
-            behavior.addEntry(cfgent.startBooleanToggle(Component.nullToEmpty("Target HitBox Color"), config.changeTargetColor)
-                    .setDefaultValue(true)
-                    .setTooltip(Component.nullToEmpty("Target hitbox color on targets?"))
-                    .setSaveConsumer(newValue -> config.changeTargetColor = newValue)
-                    .build());
-
-
-            behavior.addEntry(cfgent.startBooleanToggle(Component.nullToEmpty("HitBox Hurt"), config.hitBoxHurt)
-                    .setDefaultValue(false)
-                    .setTooltip(Component.nullToEmpty("Hitbox hurt color when hurt?"))
-                    .setSaveConsumer(newValue -> config.hitBoxHurt = newValue)
-                    .build());
-
-            behavior.addEntry(cfgent.startBooleanToggle(Component.nullToEmpty("Line Look Direction"), config.lineLookDir)
-                    .setDefaultValue(true)
-                    .setTooltip(Component.nullToEmpty("Instead of the new arrow, draw the entity's look direction as a line"))
-                    .setSaveConsumer(newValue -> config.lineLookDir = newValue)
-                    .build());
-
-            behavior.addEntry(cfgent.startBooleanToggle(Component.nullToEmpty("Hide Stuck Arrows"), config.hideArrow)
-                    .setDefaultValue(false)
-                    .setTooltip(Component.nullToEmpty("Removes bee stingers and arrows visually from other players"))
-                    .setSaveConsumer(newValue -> config.hideArrow = newValue)
-                    .build());
-
-            behavior.addEntry(cfgent.startBooleanToggle(Component.nullToEmpty("Skip Fireworks"), config.hideFireworks)
-                    .setDefaultValue(false)
-                    .setTooltip(Component.nullToEmpty("Skips rendering hitboxes for fireworks"))
-                    .setSaveConsumer(newValue -> config.hideFireworks = newValue)
-                    .build());
-
-            behavior.addEntry(cfgent.startBooleanToggle(Component.nullToEmpty("Skip Items"), config.hideItems)
-                    .setDefaultValue(false)
-                    .setTooltip(Component.nullToEmpty("Skips rendering hitboxes for dropped items"))
-                    .setSaveConsumer(newValue -> config.hideItems = newValue)
-                    .build());
-
-
-            ConfigCategory colors = builder.getOrCreateCategory(Component.nullToEmpty("Colors"));
-
-
-            colors.addEntry(cfgent.startAlphaColorField(Component.nullToEmpty("Base Color"), config.hitBoxColor)
-                    .setDefaultValue(Color.WHITE.getRGB())
-                    .setTooltip(Component.nullToEmpty("The base hitbox's color"))
-                    .setSaveConsumer(newValue -> config.hitBoxColor = newValue)
-                    .build());
-
-
-            colors.addEntry(cfgent.startAlphaColorField(Component.nullToEmpty("Eye Color"), config.eyeColor)
-                    .setDefaultValue(Color.RED.getRGB())
-                    .setTooltip(Component.nullToEmpty("The hitbox eye height color"))
-                    .setSaveConsumer(newValue -> config.eyeColor = newValue)
-                    .build());
-
-
-            colors.addEntry(cfgent.startAlphaColorField(Component.nullToEmpty("Look Direction Color"), config.lookColor)
-                    .setDefaultValue(Color.BLUE.getRGB())
-                    .setTooltip(Component.nullToEmpty("The hitbox's look direction color"))
-                    .setSaveConsumer(newValue -> config.lookColor = newValue)
-                    .build());
-
-
-            colors.addEntry(cfgent.startAlphaColorField(Component.nullToEmpty("Target Color"), config.targetBoxColor)
-                    .setDefaultValue(Color.RED.getRGB())
-                    .setTooltip(Component.nullToEmpty("The hitbox color when the entity is targeted"))
-                    .setSaveConsumer(newValue -> config.targetBoxColor = newValue)
-                    .build());
-
-
-            colors.addEntry(cfgent.startAlphaColorField(Component.nullToEmpty("Hurt Color"), config.hurtBoxColor)
-                    .setDefaultValue(Color.MAGENTA.getRGB())
-                    .setTooltip(Component.nullToEmpty("The hitbox color when the entity is on hurt tick"))
-                    .setSaveConsumer(newValue -> config.hurtBoxColor = newValue)
-                    .build());
-
-            ConfigCategory hitboxTypes = builder.getOrCreateCategory(Component.nullToEmpty("Hitbox Types"));
-
+            addSection("Hitbox Types");
             config.ensureHitboxTypes();
             if (config.hitboxTypes.isEmpty()) {
-                hitboxTypes.addEntry(cfgent.startTextDescription(Component.nullToEmpty("No custom hitbox types yet. Use + Add Hitbox Type to create one."))
-                        .build());
-            } else {
-                for (Config.HitboxType hitboxType : config.hitboxTypes) {
-                    if (hitboxType == null) {
-                        continue;
-                    }
+                addLabel(16, nextY(), 240, 12, 0xFFA0A0A0, "No custom hitbox types yet.");
+                return;
+            }
 
-                    hitboxTypes.addEntry(cfgent.startTextDescription(Component.nullToEmpty(hitboxTypeHeader(hitboxType.normalizedId())))
-                            .build());
-
-                    hitboxTypes.addEntry(cfgent.startBooleanToggle(Component.nullToEmpty("Enabled"), hitboxType.enabled)
-                            .setDefaultValue(true)
-                            .setSaveConsumer(newValue -> hitboxType.enabled = newValue)
-                            .build());
-
-                    hitboxTypes.addEntry(cfgent.startStrField(Component.nullToEmpty("Entity ID"), hitboxType.normalizedId())
-                            .setDefaultValue(DEFAULT_NEW_ID)
-                            .setTooltip(Component.nullToEmpty("Example: minecraft:zombie, minecraft:player, minecraft:item"))
-                            .setSaveConsumer(newValue -> hitboxType.id = Config.HitboxType.normalizeId(newValue))
-                            .build());
-
-                    hitboxTypes.addEntry(cfgent.startAlphaColorField(Component.nullToEmpty("Base Color"), hitboxType.baseColor)
-                            .setDefaultValue(config.hitBoxColor)
-                            .setTooltip(Component.nullToEmpty("Color used for this entity type's normal hitbox"))
-                            .setSaveConsumer(newValue -> hitboxType.baseColor = newValue)
-                            .build());
-
-                    hitboxTypes.addEntry(cfgent.startAlphaColorField(Component.nullToEmpty("Eye Color"), hitboxType.eyeColor)
-                            .setDefaultValue(config.eyeColor)
-                            .setTooltip(Component.nullToEmpty("Color used for this entity type's eye height"))
-                            .setSaveConsumer(newValue -> hitboxType.eyeColor = newValue)
-                            .build());
-
-                    hitboxTypes.addEntry(cfgent.startAlphaColorField(Component.nullToEmpty("Look Direction Color"), hitboxType.lookColor)
-                            .setDefaultValue(config.lookColor)
-                            .setTooltip(Component.nullToEmpty("Color used for this entity type's look direction"))
-                            .setSaveConsumer(newValue -> hitboxType.lookColor = newValue)
-                            .build());
-
-                    hitboxTypes.addEntry(cfgent.startAlphaColorField(Component.nullToEmpty("Target Color"), hitboxType.targetColor)
-                            .setDefaultValue(config.targetBoxColor)
-                            .setTooltip(Component.nullToEmpty("Color used when this entity type is targeted"))
-                            .setSaveConsumer(newValue -> hitboxType.targetColor = newValue)
-                            .build());
-
-                    hitboxTypes.addEntry(cfgent.startAlphaColorField(Component.nullToEmpty("Hurt Color"), hitboxType.hurtColor)
-                            .setDefaultValue(config.hurtBoxColor)
-                            .setTooltip(Component.nullToEmpty("Color used when this entity type is on hurt tick"))
-                            .setSaveConsumer(newValue -> hitboxType.hurtColor = newValue)
-                            .build());
-
-                    hitboxTypes.addEntry(cfgent.startBooleanToggle(Component.nullToEmpty("Delete"), false)
-                            .setDefaultValue(false)
-                            .setTooltip(Component.nullToEmpty("Remove this hitbox type when saving"))
-                            .setSaveConsumer(newValue -> {
-                                if (newValue) {
-                                    pendingDeletedHitboxTypes.add(hitboxType);
-                                }
-                            })
-                            .build());
+            for (Config.HitboxType hitboxType : config.hitboxTypes) {
+                if (hitboxType == null) {
+                    continue;
                 }
-            }
-
-            ConfigCategory addHitboxType = builder.getOrCreateCategory(Component.nullToEmpty("+ Add Hitbox Type"));
-
-            addHitboxType.addEntry(cfgent.startTextDescription(Component.nullToEmpty("Fill in the fields and click Save to create the hitbox type."))
-                    .build());
-
-            addHitboxType.addEntry(cfgent.startStrField(Component.nullToEmpty("Entity ID"), pendingId)
-                    .setDefaultValue(DEFAULT_NEW_ID)
-                    .setTooltip(Component.nullToEmpty("Example: minecraft:zombie, minecraft:player, minecraft:item"))
-                    .setSaveConsumer(newValue -> pendingId = Config.HitboxType.normalizeId(newValue))
-                    .build());
-
-            addHitboxType.addEntry(cfgent.startAlphaColorField(Component.nullToEmpty("Base Color"), pendingBaseColor)
-                    .setDefaultValue(config.hitBoxColor)
-                    .setTooltip(Component.nullToEmpty("Color used for this entity type's normal hitbox"))
-                    .setSaveConsumer(newValue -> pendingBaseColor = newValue)
-                    .build());
-
-            addHitboxType.addEntry(cfgent.startAlphaColorField(Component.nullToEmpty("Eye Color"), pendingEyeColor)
-                    .setDefaultValue(config.eyeColor)
-                    .setTooltip(Component.nullToEmpty("Color used for this entity type's eye height"))
-                    .setSaveConsumer(newValue -> pendingEyeColor = newValue)
-                    .build());
-
-            addHitboxType.addEntry(cfgent.startAlphaColorField(Component.nullToEmpty("Look Direction Color"), pendingLookColor)
-                    .setDefaultValue(config.lookColor)
-                    .setTooltip(Component.nullToEmpty("Color used for this entity type's look direction"))
-                    .setSaveConsumer(newValue -> pendingLookColor = newValue)
-                    .build());
-
-            addHitboxType.addEntry(cfgent.startAlphaColorField(Component.nullToEmpty("Target Color"), pendingTargetColor)
-                    .setDefaultValue(config.targetBoxColor)
-                    .setTooltip(Component.nullToEmpty("Color used when this entity type is targeted"))
-                    .setSaveConsumer(newValue -> pendingTargetColor = newValue)
-                    .build());
-
-            addHitboxType.addEntry(cfgent.startAlphaColorField(Component.nullToEmpty("Hurt Color"), pendingHurtColor)
-                    .setDefaultValue(config.hurtBoxColor)
-                    .setTooltip(Component.nullToEmpty("Color used when this entity type is on hurt tick"))
-                    .setSaveConsumer(newValue -> pendingHurtColor = newValue)
-                    .build());
-
-
-            ConfigCategory linesWidths = builder.getOrCreateCategory(Component.nullToEmpty("Line Width"));
-
-
-            linesWidths.addEntry(cfgent.startFloatField(Component.nullToEmpty("Line Width 1"), config.line1)
-                    .setMin(0)
-                    .setMax(25f)
-                    .setDefaultValue(2.5f)
-                    .setTooltip(Component.nullToEmpty("The width of the hitbox lines"))
-                    .setSaveConsumer(newValue -> config.line1 = newValue)
-                    .build());
-
-            linesWidths.addEntry(cfgent.startDoubleField(Component.nullToEmpty("Distance for width 2"), config.distFor2)
-                    .setMin(0)
-                    .setMax(256)
-                    .setDefaultValue(32)
-                    .setTooltip(Component.nullToEmpty("The distance for Line Width 2 to be used"))
-                    .setSaveConsumer(newValue -> config.distFor2 = newValue)
-                    .build());
-
-            linesWidths.addEntry(cfgent.startFloatField(Component.nullToEmpty("Line Width 2"), config.line2)
-                    .setMin(0)
-                    .setMax(25f)
-                    .setDefaultValue(2.5f)
-                    .setTooltip(Component.nullToEmpty("The width of the hitbox lines beyond the set distance"))
-                    .setSaveConsumer(newValue -> config.line2 = newValue)
-                    .build());
-
-            ConfigCategory outline = builder.getOrCreateCategory(Component.nullToEmpty("Outline"));
-
-            outline.addEntry(cfgent.startBooleanToggle(Component.nullToEmpty("Outline Enabled"), config.outlineEnabled)
-                    .setDefaultValue(false)
-                    .setTooltip(Component.nullToEmpty("Enable hitbox outlines"))
-                    .setSaveConsumer(newValue -> config.outlineEnabled = newValue)
-                    .build());
-
-            outline.addEntry(cfgent.startAlphaColorField(Component.nullToEmpty("Outline Color"), config.outlineColor)
-                    .setDefaultValue(Color.BLACK.getRGB())
-                    .setTooltip(Component.nullToEmpty("The hitbox's outline color"))
-                    .setSaveConsumer(newValue -> config.outlineColor = newValue)
-                    .build());
-
-            outline.addEntry(cfgent.startFloatField(Component.nullToEmpty("Outline Size Multiplier"), config.outlineMultiplier)
-                    .setDefaultValue(2)
-                    .setMin(Math.nextUp(1))
-                    .setMax(10F)
-                    .setTooltip(Component.nullToEmpty("How much the hitbox's line width will be multiplied by for the outline"))
-                    .setSaveConsumer(newValue -> config.outlineMultiplier = newValue)
-                    .build());
-
-            return builder.build();
-        };
-    }
-
-    private void addPendingHitboxType(Config config) {
-        String normalizedPendingId = Config.HitboxType.normalizeId(pendingId);
-        if (!hasPendingChanges() || normalizedPendingId.isBlank()) {
-            return;
-        }
-
-        config.addHitboxType(
-                normalizedPendingId,
-                pendingBaseColor,
-                pendingEyeColor,
-                pendingLookColor,
-                pendingTargetColor,
-                pendingHurtColor
-        );
-        resetPendingHitboxType(config);
-    }
-
-    private void removePendingDeletedHitboxTypes(Config config) {
-        if (pendingDeletedHitboxTypes.isEmpty()) {
-            return;
-        }
-
-        config.hitboxTypes.removeAll(pendingDeletedHitboxTypes);
-        pendingDeletedHitboxTypes.clear();
-    }
-
-    private boolean hasPendingChanges() {
-        return !DEFAULT_NEW_ID.equals(Config.HitboxType.normalizeId(pendingId))
-                || pendingBaseColor != pendingDefaultBaseColor
-                || pendingEyeColor != pendingDefaultEyeColor
-                || pendingLookColor != pendingDefaultLookColor
-                || pendingTargetColor != pendingDefaultTargetColor
-                || pendingHurtColor != pendingDefaultHurtColor;
-    }
-
-    private void resetPendingHitboxType(Config config) {
-        pendingId = DEFAULT_NEW_ID;
-        pendingBaseColor = config.hitBoxColor;
-        pendingEyeColor = config.eyeColor;
-        pendingLookColor = config.lookColor;
-        pendingTargetColor = config.targetBoxColor;
-        pendingHurtColor = config.hurtBoxColor;
-        pendingDefaultBaseColor = pendingBaseColor;
-        pendingDefaultEyeColor = pendingEyeColor;
-        pendingDefaultLookColor = pendingLookColor;
-        pendingDefaultTargetColor = pendingTargetColor;
-        pendingDefaultHurtColor = pendingHurtColor;
-    }
-
-    private static String hitboxTypeHeader(String id) {
-        return "§6── §r" + displayNameFromId(id) + " §6──";
-    }
-
-    private static String displayNameFromId(String id) {
-        String value = Config.HitboxType.normalizeId(id);
-        int namespaceSeparator = value.indexOf(':');
-        if (namespaceSeparator >= 0 && namespaceSeparator + 1 < value.length()) {
-            value = value.substring(namespaceSeparator + 1);
-        }
-
-        String[] words = value.split("_+");
-        StringBuilder displayName = new StringBuilder();
-        for (String word : words) {
-            if (word.isBlank()) {
-                continue;
-            }
-            if (!displayName.isEmpty()) {
-                displayName.append(' ');
-            }
-            displayName.append(Character.toUpperCase(word.charAt(0)));
-            if (word.length() > 1) {
-                displayName.append(word.substring(1).toLowerCase());
+                addSection(displayNameFromId(hitboxType.normalizedId()));
+                addToggleRow("Enabled", hitboxType.enabled, value -> hitboxType.enabled = value);
+                addTextRow("Entity ID", hitboxType.normalizedId(), value -> hitboxType.id = Config.HitboxType.normalizeId(value));
+                addColorRow("Base Color", hitboxType.baseColor, value -> hitboxType.baseColor = value);
+                addColorRow("Eye Color", hitboxType.eyeColor, value -> hitboxType.eyeColor = value);
+                addColorRow("Look Direction Color", hitboxType.lookColor, value -> hitboxType.lookColor = value);
+                addColorRow("Target Color", hitboxType.targetColor, value -> hitboxType.targetColor = value);
+                addColorRow("Hurt Color", hitboxType.hurtColor, value -> hitboxType.hurtColor = value);
+                addButton(new ButtonGeneric(176, nextY(), 72, 20, "Delete"), (button, mouseButton) -> {
+                    config.hitboxTypes.remove(hitboxType);
+                    initGui();
+                });
             }
         }
 
-        return displayName.isEmpty() ? value : displayName.toString();
-    }
-
-    private static void removeSearchField(Screen screen) {
-        if (!(screen instanceof ClothConfigScreen clothConfigScreen)) {
-            return;
+        private void buildLineWidth() {
+            addFloatRow("Line Width 1", config.line1, 0, 25, value -> config.line1 = value);
+            addDoubleRow("Distance for width 2", config.distFor2, 0, 256, value -> config.distFor2 = value);
+            addFloatRow("Line Width 2", config.line2, 0, 25, value -> config.line2 = value);
         }
 
-        List<?> entries = clothConfigScreen.listWidget.children();
-        for (int index = 0; index < entries.size(); index++) {
-            if (!(entries.get(index) instanceof SearchFieldEntry)) {
-                continue;
+        private void buildOutline() {
+            addToggleRow("Outline Enabled", config.outlineEnabled, value -> config.outlineEnabled = value);
+            addColorRow("Outline Color", config.outlineColor, value -> config.outlineColor = value);
+            addFloatRow("Outline Size Multiplier", config.outlineMultiplier, Math.nextUp(1f), 10, value -> config.outlineMultiplier = value);
+        }
+
+        private void addSection(String label) {
+            addLabel(16, nextY() + 4, 280, 14, 0xFFFFD37A, label);
+            contentY += 8;
+        }
+
+        private void addToggleRow(String label, boolean value, Consumer<Boolean> consumer) {
+            int y = nextY();
+            addLabel(16, y + 6, 150, 12, 0xFFFFFFFF, label);
+            addButton(new ButtonGeneric(176, y, 64, 20, value ? "ON" : "OFF"), (button, mouseButton) -> {
+                consumer.accept(!value);
+                initGui();
+            });
+        }
+
+        private void addTextRow(String label, String value, Consumer<String> consumer) {
+            int y = nextY();
+            addLabel(16, y + 6, 150, 12, 0xFFFFFFFF, label);
+            GuiTextFieldGeneric field = new GuiTextFieldGeneric(176, y, 180, 20, font);
+            field.setValueWrapper(value);
+            addTextField(field, new ChangeListener(consumer));
+        }
+
+        private void addFloatRow(String label, float value, float min, float max, Consumer<Float> consumer) {
+            addTextRow(label, Float.toString(value), text -> {
+                try {
+                    consumer.accept(clamp(Float.parseFloat(text), min, max));
+                } catch (NumberFormatException ignored) {
+                }
+            });
+        }
+
+        private void addDoubleRow(String label, double value, double min, double max, Consumer<Double> consumer) {
+            addTextRow(label, Double.toString(value), text -> {
+                try {
+                    consumer.accept(clamp(Double.parseDouble(text), min, max));
+                } catch (NumberFormatException ignored) {
+                }
+            });
+        }
+
+        private void addColorRow(String label, int value, Consumer<Integer> consumer) {
+            int y = nextY();
+            addLabel(16, y + 6, 150, 12, 0xFFFFFFFF, label);
+            addWidget(new ColorPreviewWidget(176, y + 2, value));
+            GuiTextFieldGeneric field = new GuiTextFieldGeneric(202, y, 96, 20, font);
+            field.setMaxLengthWrapper(8);
+            field.setValueWrapper(hexColor(value));
+            addTextField(field, new ChangeListener(text -> parseHexColor(text, value, consumer)));
+        }
+
+        private int nextY() {
+            int y = contentY;
+            contentY += 26;
+            return y;
+        }
+
+        private void addPendingHitboxType() {
+            String normalizedPendingId = Config.HitboxType.normalizeId(pendingId);
+            if (normalizedPendingId.isBlank()) {
+                return;
             }
 
-            entries.remove(index);
-            if (index > 0 && entries.get(index - 1) instanceof EmptyEntry) {
-                entries.remove(index - 1);
-                index--;
+            config.addHitboxType(
+                    normalizedPendingId,
+                    pendingBaseColor,
+                    pendingEyeColor,
+                    pendingLookColor,
+                    pendingTargetColor,
+                    pendingHurtColor
+            );
+            resetPendingHitboxType();
+        }
+
+        private void resetPendingHitboxType() {
+            pendingId = DEFAULT_NEW_ID;
+            pendingBaseColor = config.hitBoxColor;
+            pendingEyeColor = config.eyeColor;
+            pendingLookColor = config.lookColor;
+            pendingTargetColor = config.targetBoxColor;
+            pendingHurtColor = config.hurtBoxColor;
+        }
+
+        private static void parseHexColor(String text, int fallback, Consumer<Integer> consumer) {
+            String normalized = text.trim();
+            if (normalized.startsWith("#")) {
+                normalized = normalized.substring(1);
             }
-            if (index < entries.size() && entries.get(index) instanceof EmptyEntry) {
-                entries.remove(index);
+            if (!normalized.matches("[0-9a-fA-F]{8}")) {
+                consumer.accept(fallback);
+                return;
             }
-            return;
+            consumer.accept((int) Long.parseLong(normalized, 16));
+        }
+
+        private static String hexColor(int color) {
+            return String.format(Locale.ROOT, "%08X", color);
+        }
+
+        private static String displayNameFromId(String id) {
+            String value = Config.HitboxType.normalizeId(id);
+            int namespaceSeparator = value.indexOf(':');
+            if (namespaceSeparator >= 0 && namespaceSeparator + 1 < value.length()) {
+                value = value.substring(namespaceSeparator + 1);
+            }
+            return value.replace('_', ' ');
+        }
+
+        private static float clamp(float value, float min, float max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        private static double clamp(double value, double min, double max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        private enum Tab {
+            BEHAVIOR("Behavior"),
+            COLORS("Colors"),
+            HITBOX_TYPES("Hitbox Types"),
+            LINE_WIDTH("Line Width"),
+            OUTLINE("Outline");
+
+            private final String label;
+
+            Tab(String label) {
+                this.label = label;
+            }
+        }
+
+        private static class ChangeListener implements ITextFieldListener<GuiTextFieldGeneric> {
+            private final Consumer<String> consumer;
+
+            private ChangeListener(Consumer<String> consumer) {
+                this.consumer = consumer;
+            }
+
+            @Override
+            public boolean onTextChange(GuiTextFieldGeneric textField) {
+                consumer.accept(textField.getValueWrapper());
+                return true;
+            }
+        }
+
+        private static class ColorPreviewWidget extends fi.dy.masa.malilib.gui.widgets.WidgetBase {
+            private final int color;
+
+            private ColorPreviewWidget(int x, int y, int color) {
+                super(x, y, 18, 16);
+                this.color = color;
+            }
+
+            @Override
+            public void render(GuiContext context, int mouseX, int mouseY, boolean selected) {
+                RenderUtils.drawOutlinedBox(context, x, y, width, height, 0xFF000000, 0xFF909090);
+                RenderUtils.drawRect(context, x + 2, y + 2, width - 4, height - 4, color);
+            }
         }
     }
 }
