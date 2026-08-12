@@ -271,7 +271,7 @@ public class ModMenu implements ModMenuApi {
         private void addToggleRow(String label, boolean value, Consumer<Boolean> consumer) {
             int y = nextY();
             addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, label);
-            addButton(new ButtonGeneric(CONTROL_X, y, SMALL_BUTTON_WIDTH, BUTTON_HEIGHT, value ? "ON" : "OFF"), (button, mouseButton) -> {
+            addButton(new ToggleButton(CONTROL_X, y, SMALL_BUTTON_WIDTH, BUTTON_HEIGHT, value), (button, mouseButton) -> {
                 consumer.accept(!value);
                 initGui();
             });
@@ -588,6 +588,30 @@ public class ModMenu implements ModMenuApi {
                 if (widget == null || !widget.suppressCallback) {
                     consumer.accept(value);
                 }
+            }
+        }
+    }
+
+    private static class ToggleButton extends ButtonGeneric {
+        private static final int ON_COLOR = 0xFF55FF55;
+        private static final int OFF_COLOR = 0xFFFF5555;
+        private final boolean value;
+
+        private ToggleButton(int x, int y, int width, int height, boolean value) {
+            super(x, y, width, height, value ? "ON" : "OFF");
+            this.value = value;
+        }
+
+        @Override
+        public void render(fi.dy.masa.malilib.render.GuiContext context, int mouseX, int mouseY, boolean selected) {
+            String label = displayString;
+            displayString = "";
+            super.render(context, mouseX, mouseY, selected);
+            displayString = label;
+
+            if (visible) {
+                int textY = y + (height - 8) / 2;
+                drawCenteredStringWithShadow(context, x + width / 2, textY, value ? ON_COLOR : OFF_COLOR, label);
             }
         }
     }
