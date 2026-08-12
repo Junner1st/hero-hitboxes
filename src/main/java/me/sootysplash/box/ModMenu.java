@@ -9,7 +9,6 @@ import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.GuiTextFieldGeneric;
-import fi.dy.masa.malilib.gui.button.ButtonBase;
 import fi.dy.masa.malilib.gui.button.ButtonGeneric;
 import fi.dy.masa.malilib.gui.interfaces.ITextFieldListener;
 import fi.dy.masa.malilib.render.GuiContext;
@@ -25,6 +24,24 @@ import java.util.function.Consumer;
 
 public class ModMenu implements ModMenuApi {
     private static final String DEFAULT_NEW_ID = "minecraft:zombie";
+    private static final int TITLE_X = 12;
+    private static final int TAB_X = 10;
+    private static final int TAB_Y = 26;
+    private static final int TAB_WIDTH = 102;
+    private static final int TAB_GAP = 2;
+    private static final int CONTENT_START_Y = 52;
+    private static final int ROW_X = 16;
+    private static final int LABEL_WIDTH = 150;
+    private static final int CONTROL_X = 174;
+    private static final int ROW_HEIGHT = 22;
+    private static final int BUTTON_HEIGHT = 20;
+    private static final int LABEL_Y_OFFSET = 6;
+    private static final int TEXT_FIELD_WIDTH = 180;
+    private static final int COLOR_PREVIEW_SIZE = 16;
+    private static final int COLOR_FIELD_X = CONTROL_X + COLOR_PREVIEW_SIZE + 6;
+    private static final int COLOR_FIELD_WIDTH = 84;
+    private static final int SMALL_BUTTON_WIDTH = 60;
+    private static final int DELETE_BUTTON_WIDTH = 58;
 
     @Override
     public ConfigScreenFactory<?> getModConfigScreenFactory() {
@@ -66,28 +83,27 @@ public class ModMenu implements ModMenuApi {
             super.initGui();
             clearElements();
 
-            int x = 16;
-            int y = 28;
+            int x = TAB_X;
             for (Tab tab : Tab.values()) {
-                ButtonGeneric button = new ButtonGeneric(x, y, 104, 20, tab.label);
+                ButtonGeneric button = new ButtonGeneric(x, TAB_Y, TAB_WIDTH, BUTTON_HEIGHT, tab.label);
                 button.setEnabled(tab != selectedTab);
                 addButton(button, (pressedButton, mouseButton) -> {
                     selectedTab = tab;
                     scrollOffset = 0;
                     initGui();
                 });
-                x += 108;
+                x += TAB_WIDTH + TAB_GAP;
             }
 
-            addButton(new ButtonGeneric(width - 168, height - 28, 72, 20, "Save"), (button, mouseButton) -> {
+            addButton(new ButtonGeneric(width - 136, height - 26, SMALL_BUTTON_WIDTH, BUTTON_HEIGHT, "Save"), (button, mouseButton) -> {
                 config.save();
                 Minecraft.getInstance().setScreen(parent);
             });
-            addButton(new ButtonGeneric(width - 88, height - 28, 72, 20, "Cancel"), (button, mouseButton) -> {
+            addButton(new ButtonGeneric(width - 72, height - 26, SMALL_BUTTON_WIDTH, BUTTON_HEIGHT, "Cancel"), (button, mouseButton) -> {
                 Minecraft.getInstance().setScreen(parent);
             });
 
-            contentY = 58 - scrollOffset;
+            contentY = CONTENT_START_Y - scrollOffset;
             switch (selectedTab) {
                 case BEHAVIOR -> buildBehavior();
                 case COLORS -> buildColors();
@@ -111,7 +127,7 @@ public class ModMenu implements ModMenuApi {
         @Override
         protected void drawContents(GuiContext context, int mouseX, int mouseY, float partialTicks) {
             super.drawContents(context, mouseX, mouseY, partialTicks);
-            drawString(context, "Hero Hitboxes", 16, 10, 0xFFFFFFFF);
+            drawString(context, "Hero Hitboxes", TITLE_X, 10, 0xFFFFFFFF);
         }
 
         private void buildBehavior() {
@@ -135,14 +151,14 @@ public class ModMenu implements ModMenuApi {
         }
 
         private void buildHitboxTypes() {
-            addLabel(16, nextY() + 4, 280, 14, 0xFFFFD37A, "Add Hitbox Type");
+            addLabel(ROW_X, nextY() + 4, 280, 14, 0xFFFFD37A, "Add Hitbox Type");
             addTextRow("Entity ID", pendingId, value -> pendingId = Config.HitboxType.normalizeId(value));
             addColorRow("Base Color", pendingBaseColor, value -> pendingBaseColor = value);
             addColorRow("Eye Color", pendingEyeColor, value -> pendingEyeColor = value);
             addColorRow("Look Direction Color", pendingLookColor, value -> pendingLookColor = value);
             addColorRow("Target Color", pendingTargetColor, value -> pendingTargetColor = value);
             addColorRow("Hurt Color", pendingHurtColor, value -> pendingHurtColor = value);
-            addButton(new ButtonGeneric(176, nextY(), 136, 20, "Add Hitbox Type"), (button, mouseButton) -> {
+            addButton(new ButtonGeneric(CONTROL_X, nextY(), 122, BUTTON_HEIGHT, "Add Hitbox Type"), (button, mouseButton) -> {
                 addPendingHitboxType();
                 initGui();
             });
@@ -165,7 +181,7 @@ public class ModMenu implements ModMenuApi {
                 String message = config.hitboxTypes.isEmpty()
                         ? "No custom hitbox types yet."
                         : "No hitbox types match the current search.";
-                addLabel(16, nextY(), 260, 12, 0xFFA0A0A0, message);
+                addLabel(ROW_X, nextY(), 260, 12, 0xFFA0A0A0, message);
             }
         }
 
@@ -174,7 +190,7 @@ public class ModMenu implements ModMenuApi {
             boolean expanded = expandedTypeIds.contains(id);
             int y = nextY();
 
-            addButton(new ButtonGeneric(16, y, 20, 20, expanded ? "v" : ">"), (button, mouseButton) -> {
+            addButton(new ButtonGeneric(ROW_X, y, BUTTON_HEIGHT, BUTTON_HEIGHT, expanded ? "v" : ">"), (button, mouseButton) -> {
                 if (expanded) {
                     expandedTypeIds.remove(id);
                 } else {
@@ -182,9 +198,9 @@ public class ModMenu implements ModMenuApi {
                 }
                 initGui();
             });
-            addLabel(44, y + 6, 150, 12, 0xFFFFFFFF, displayNameFromId(id));
-            addWidget(new ColorPreviewWidget(176, y + 2, hitboxType.baseColor));
-            addButton(new ButtonGeneric(202, y, 72, 20, "Delete"), (button, mouseButton) -> deleteHitboxType(hitboxType));
+            addLabel(44, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, displayNameFromId(id));
+            addWidget(new ColorPreviewWidget(CONTROL_X, y + 2, hitboxType.baseColor));
+            addButton(new ButtonGeneric(COLOR_FIELD_X, y, DELETE_BUTTON_WIDTH, BUTTON_HEIGHT, "Delete"), (button, mouseButton) -> deleteHitboxType(hitboxType));
 
             if (!expanded) {
                 return;
@@ -203,11 +219,11 @@ public class ModMenu implements ModMenuApi {
 
         private void addHitboxTypeIdRow(Config.HitboxType hitboxType) {
             int y = nextY();
-            addLabel(16, y + 6, 150, 12, 0xFFFFFFFF, "Entity ID");
-            GuiTextFieldGeneric field = new GuiTextFieldGeneric(176, y, 180, 20, font);
+            addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, "Entity ID");
+            GuiTextFieldGeneric field = new GuiTextFieldGeneric(CONTROL_X, y, TEXT_FIELD_WIDTH, BUTTON_HEIGHT, font);
             field.setValueWrapper(hitboxType.normalizedId());
             addTextField(field, new ChangeListener(value -> hitboxType.id = Config.HitboxType.normalizeId(value)));
-            addButton(new ButtonGeneric(364, y, 72, 20, "Delete"), (button, mouseButton) -> deleteHitboxType(hitboxType));
+            addButton(new ButtonGeneric(CONTROL_X + TEXT_FIELD_WIDTH + 8, y, DELETE_BUTTON_WIDTH, BUTTON_HEIGHT, "Delete"), (button, mouseButton) -> deleteHitboxType(hitboxType));
         }
 
         private void deleteHitboxType(Config.HitboxType hitboxType) {
@@ -229,14 +245,14 @@ public class ModMenu implements ModMenuApi {
         }
 
         private void addSection(String label) {
-            addLabel(16, nextY() + 4, 280, 14, 0xFFFFD37A, label);
+            addLabel(ROW_X, nextY() + 4, 280, 14, 0xFFFFD37A, label);
             contentY += 8;
         }
 
         private void addToggleRow(String label, boolean value, Consumer<Boolean> consumer) {
             int y = nextY();
-            addLabel(16, y + 6, 150, 12, 0xFFFFFFFF, label);
-            addButton(new ButtonGeneric(176, y, 64, 20, value ? "ON" : "OFF"), (button, mouseButton) -> {
+            addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, label);
+            addButton(new ButtonGeneric(CONTROL_X, y, SMALL_BUTTON_WIDTH, BUTTON_HEIGHT, value ? "ON" : "OFF"), (button, mouseButton) -> {
                 consumer.accept(!value);
                 initGui();
             });
@@ -244,16 +260,16 @@ public class ModMenu implements ModMenuApi {
 
         private void addTextRow(String label, String value, Consumer<String> consumer) {
             int y = nextY();
-            addLabel(16, y + 6, 150, 12, 0xFFFFFFFF, label);
-            GuiTextFieldGeneric field = new GuiTextFieldGeneric(176, y, 180, 20, font);
+            addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, label);
+            GuiTextFieldGeneric field = new GuiTextFieldGeneric(CONTROL_X, y, TEXT_FIELD_WIDTH, BUTTON_HEIGHT, font);
             field.setValueWrapper(value);
             addTextField(field, new ChangeListener(consumer));
         }
 
         private void addSearchRow() {
             int y = nextY();
-            addLabel(16, y + 6, 150, 12, 0xFFFFFFFF, "Search");
-            GuiTextFieldGeneric field = new GuiTextFieldGeneric(176, y, 180, 20, font);
+            addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, "Search");
+            GuiTextFieldGeneric field = new GuiTextFieldGeneric(CONTROL_X, y, TEXT_FIELD_WIDTH, BUTTON_HEIGHT, font);
             field.setValueWrapper(typeSearch);
             addTextField(field, new SearchChangeListener());
 
@@ -285,9 +301,9 @@ public class ModMenu implements ModMenuApi {
 
         private void addColorRow(String label, int value, Consumer<Integer> consumer) {
             int y = nextY();
-            addLabel(16, y + 6, 150, 12, 0xFFFFFFFF, label);
-            addWidget(new ColorPreviewWidget(176, y + 2, value));
-            GuiTextFieldGeneric field = new GuiTextFieldGeneric(202, y, 96, 20, font);
+            addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, label);
+            addWidget(new ColorPreviewWidget(CONTROL_X, y + 2, value));
+            GuiTextFieldGeneric field = new GuiTextFieldGeneric(COLOR_FIELD_X, y, COLOR_FIELD_WIDTH, BUTTON_HEIGHT, font);
             field.setMaxLengthWrapper(8);
             field.setValueWrapper(hexColor(value));
             addTextField(field, new ChangeListener(text -> parseHexColor(text, value, consumer)));
@@ -295,7 +311,7 @@ public class ModMenu implements ModMenuApi {
 
         private int nextY() {
             int y = contentY;
-            contentY += 26;
+            contentY += ROW_HEIGHT;
             return y;
         }
 
@@ -413,13 +429,14 @@ public class ModMenu implements ModMenuApi {
             private final int color;
 
             private ColorPreviewWidget(int x, int y, int color) {
-                super(x, y, 18, 16);
+                super(x, y, COLOR_PREVIEW_SIZE, COLOR_PREVIEW_SIZE);
                 this.color = color;
             }
 
             @Override
             public void render(GuiContext context, int mouseX, int mouseY, boolean selected) {
-                RenderUtils.drawOutlinedBox(context, x, y, width, height, 0xFF000000, 0xFF909090);
+                RenderUtils.drawRect(context, x, y, width, height, 0xFF000000);
+                RenderUtils.drawRect(context, x + 1, y + 1, width - 2, height - 2, 0xFF707070);
                 RenderUtils.drawRect(context, x + 2, y + 2, width - 4, height - 4, color);
             }
         }
