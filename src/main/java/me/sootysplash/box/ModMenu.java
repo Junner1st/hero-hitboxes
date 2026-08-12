@@ -11,7 +11,6 @@ import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.GuiTextFieldGeneric;
 import fi.dy.masa.malilib.gui.button.ButtonGeneric;
 import fi.dy.masa.malilib.gui.interfaces.ITextFieldListener;
-import fi.dy.masa.malilib.render.GuiContext;
 import fi.dy.masa.malilib.render.RenderUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -24,7 +23,6 @@ import java.util.function.Consumer;
 
 public class ModMenu implements ModMenuApi {
     private static final String DEFAULT_NEW_ID = "minecraft:zombie";
-    private static final int TITLE_X = 12;
     private static final int TAB_X = 10;
     private static final int TAB_Y = 26;
     private static final int TAB_WIDTH = 102;
@@ -122,12 +120,6 @@ public class ModMenu implements ModMenuApi {
                 return true;
             }
             return super.onMouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
-        }
-
-        @Override
-        protected void drawContents(GuiContext context, int mouseX, int mouseY, float partialTicks) {
-            super.drawContents(context, mouseX, mouseY, partialTicks);
-            drawString(context, "Hero Hitboxes", TITLE_X, 10, 0xFFFFFFFF);
         }
 
         private void buildBehavior() {
@@ -434,7 +426,7 @@ public class ModMenu implements ModMenuApi {
             }
 
             @Override
-            public void render(GuiContext context, int mouseX, int mouseY, boolean selected) {
+            public void render(fi.dy.masa.malilib.render.GuiContext context, int mouseX, int mouseY, boolean selected) {
                 RenderUtils.drawRect(context, x, y, width, height, 0xFF000000);
                 RenderUtils.drawRect(context, x + 1, y + 1, width - 2, height - 2, 0xFF707070);
                 RenderUtils.drawRect(context, x + 2, y + 2, width - 4, height - 4, color);
