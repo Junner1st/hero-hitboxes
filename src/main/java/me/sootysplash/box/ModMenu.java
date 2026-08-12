@@ -413,9 +413,9 @@ public class ModMenu implements ModMenuApi {
             BEHAVIOR("Behavior"),
             COLORS("Colors"),
             HITBOX_TYPES("Hitbox Types"),
-            KEYBINDS("Keybinds"),
             LINE_WIDTH("Line Width"),
-            OUTLINE("Outline");
+            OUTLINE("Outline"),
+            KEYBINDS("Keybinds");
 
             private final String label;
 
