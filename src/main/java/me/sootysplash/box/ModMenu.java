@@ -11,8 +11,9 @@ import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.GuiTextFieldGeneric;
 import fi.dy.masa.malilib.gui.button.ButtonGeneric;
 import fi.dy.masa.malilib.gui.interfaces.ITextFieldListener;
+import fi.dy.masa.malilib.gui.widgets.WidgetColorIndicator;
 import fi.dy.masa.malilib.gui.wrappers.TextFieldType;
-import fi.dy.masa.malilib.render.RenderUtils;
+import fi.dy.masa.malilib.util.data.Color4f;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -43,7 +44,7 @@ public class ModMenu implements ModMenuApi {
     private static final int DELETE_BUTTON_WIDTH = 58;
     private static final int ADD_TYPE_BUTTON_WIDTH = 118;
     private static final int TEXT_FIELD_MAX_LENGTH = 256;
-    private static final int COLOR_FIELD_MAX_LENGTH = 8;
+    private static final int COLOR_FIELD_MAX_LENGTH = 9;
 
     @Override
     public ConfigScreenFactory<?> getModConfigScreenFactory() {
@@ -180,7 +181,10 @@ public class ModMenu implements ModMenuApi {
                 initGui();
             });
             addLabel(44, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, displayNameFromId(id));
-            addWidget(new ColorPreviewWidget(CONTROL_X, y + 2, hitboxType.baseColor));
+            addWidget(new ColorIndicatorWidget(CONTROL_X, y + 2, COLOR_PREVIEW_SIZE, COLOR_PREVIEW_SIZE, hitboxType.baseColor, newValue -> {
+                hitboxType.baseColor = newValue;
+                initGui();
+            }));
             addButton(new ButtonGeneric(COLOR_FIELD_X, y, DELETE_BUTTON_WIDTH, BUTTON_HEIGHT, "Delete"), (button, mouseButton) -> deleteHitboxType(hitboxType));
 
             if (!expanded) {
@@ -280,10 +284,16 @@ public class ModMenu implements ModMenuApi {
         private void addColorRow(String label, int value, Consumer<Integer> consumer) {
             int y = nextY();
             addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, label);
-            addWidget(new ColorPreviewWidget(CONTROL_X, y + 2, value));
-            GuiTextFieldGeneric field = new GuiTextFieldGeneric(COLOR_FIELD_X, y, COLOR_FIELD_WIDTH, BUTTON_HEIGHT, font);
+            ColorIndicatorWidget indicator = new ColorIndicatorWidget(CONTROL_X, y + 2, COLOR_PREVIEW_SIZE, COLOR_PREVIEW_SIZE, value, newValue -> {
+                consumer.accept(newValue);
+                initGui();
+            });
+            addWidget(indicator);
+            GuiTextFieldGeneric field = new ColorTextField(COLOR_FIELD_X, y, COLOR_FIELD_WIDTH, BUTTON_HEIGHT, font, indicator, consumer);
             field.setValueWrapper(hexColor(value));
-            addTextField(field, new ChangeListener(text -> parseHexColor(text, value, consumer)), TextFieldType.STRING);
+            field.setMaxLengthWrapper(TEXT_FIELD_MAX_LENGTH);
+            addTextField(field, new ChangeListener(text -> {
+            }), TextFieldType.STRING);
             field.setMaxLengthWrapper(COLOR_FIELD_MAX_LENGTH);
         }
 
@@ -301,20 +311,8 @@ public class ModMenu implements ModMenuApi {
             pendingDeletedHitboxTypes.clear();
         }
 
-        private static void parseHexColor(String text, int fallback, Consumer<Integer> consumer) {
-            String normalized = text.trim();
-            if (normalized.startsWith("#")) {
-                normalized = normalized.substring(1);
-            }
-            if (!normalized.matches("[0-9a-fA-F]{8}")) {
-                consumer.accept(fallback);
-                return;
-            }
-            consumer.accept((int) Long.parseLong(normalized, 16));
-        }
-
         private static String hexColor(int color) {
-            return String.format(Locale.ROOT, "%08X", color);
+            return String.format(Locale.ROOT, "#%08X", color);
         }
 
         private static String displayNameFromId(String id) {
@@ -461,10 +459,16 @@ public class ModMenu implements ModMenuApi {
         private void addColorRow(String label, int value, Consumer<Integer> consumer) {
             int y = nextY();
             addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, label);
-            addWidget(new ColorPreviewWidget(CONTROL_X, y + 2, value));
-            GuiTextFieldGeneric field = new GuiTextFieldGeneric(COLOR_FIELD_X, y, COLOR_FIELD_WIDTH, BUTTON_HEIGHT, font);
+            ColorIndicatorWidget indicator = new ColorIndicatorWidget(CONTROL_X, y + 2, COLOR_PREVIEW_SIZE, COLOR_PREVIEW_SIZE, value, newValue -> {
+                consumer.accept(newValue);
+                initGui();
+            });
+            addWidget(indicator);
+            GuiTextFieldGeneric field = new ColorTextField(COLOR_FIELD_X, y, COLOR_FIELD_WIDTH, BUTTON_HEIGHT, font, indicator, consumer);
             field.setValueWrapper(MalilibConfigScreen.hexColor(value));
-            addTextField(field, new ChangeListener(text -> MalilibConfigScreen.parseHexColor(text, value, consumer)), TextFieldType.STRING);
+            field.setMaxLengthWrapper(TEXT_FIELD_MAX_LENGTH);
+            addTextField(field, new ChangeListener(text -> {
+            }), TextFieldType.STRING);
             field.setMaxLengthWrapper(COLOR_FIELD_MAX_LENGTH);
         }
 
@@ -489,19 +493,83 @@ public class ModMenu implements ModMenuApi {
         }
     }
 
-    private static class ColorPreviewWidget extends fi.dy.masa.malilib.gui.widgets.WidgetBase {
-        private final int color;
+    private static class ColorIndicatorWidget extends WidgetColorIndicator {
+        private final ColorCallback callback;
+        private boolean suppressCallback;
 
-        private ColorPreviewWidget(int x, int y, int color) {
-            super(x, y, COLOR_PREVIEW_SIZE, COLOR_PREVIEW_SIZE);
-            this.color = color;
+        private ColorIndicatorWidget(int x, int y, int width, int height, int color, java.util.function.IntConsumer consumer) {
+            this(x, y, width, height, color, new ColorCallback(consumer));
+        }
+
+        private ColorIndicatorWidget(int x, int y, int width, int height, int color, ColorCallback callback) {
+            super(x, y, width, height, Color4f.fromColor(color), callback);
+            this.callback = callback;
+            this.callback.widget = this;
+        }
+
+        private void setColor(int color) {
+            suppressCallback = true;
+            try {
+                config.setIntegerValue(color);
+            } finally {
+                suppressCallback = false;
+            }
+        }
+
+        private int currentColor() {
+            return config.getIntegerValue();
+        }
+
+        private static class ColorCallback implements java.util.function.IntConsumer {
+            private final java.util.function.IntConsumer consumer;
+            private ColorIndicatorWidget widget;
+
+            private ColorCallback(java.util.function.IntConsumer consumer) {
+                this.consumer = consumer;
+            }
+
+            @Override
+            public void accept(int value) {
+                if (widget == null || !widget.suppressCallback) {
+                    consumer.accept(value);
+                }
+            }
+        }
+    }
+
+    private static class ColorTextField extends GuiTextFieldGeneric {
+        private final ColorIndicatorWidget indicator;
+        private final Consumer<Integer> consumer;
+
+        private ColorTextField(int x, int y, int width, int height, net.minecraft.client.gui.Font font, ColorIndicatorWidget indicator, Consumer<Integer> consumer) {
+            super(x, y, width, height, font);
+            this.indicator = indicator;
+            this.consumer = consumer;
         }
 
         @Override
-        public void render(fi.dy.masa.malilib.render.GuiContext context, int mouseX, int mouseY, boolean selected) {
-            RenderUtils.drawRect(context, x, y, width, height, 0xFF000000);
-            RenderUtils.drawRect(context, x + 1, y + 1, width - 2, height - 2, 0xFF707070);
-            RenderUtils.drawRect(context, x + 2, y + 2, width - 4, height - 4, color);
+        public void setFocused(boolean focused) {
+            boolean wasFocused = isFocused();
+            super.setFocused(focused);
+            if (wasFocused && !focused) {
+                applyColor();
+            }
+        }
+
+        private void applyColor() {
+            String normalized = getValueWrapper().trim();
+            if (normalized.startsWith("#")) {
+                normalized = normalized.substring(1);
+            }
+
+            if (normalized.matches("[0-9a-fA-F]{8}")) {
+                int color = (int) Long.parseLong(normalized, 16);
+                indicator.setColor(color);
+                consumer.accept(color);
+                setValueWrapper(MalilibConfigScreen.hexColor(color));
+            } else {
+                setValueWrapper(MalilibConfigScreen.hexColor(indicator.currentColor()));
+            }
         }
     }
 }
