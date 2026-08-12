@@ -185,6 +185,7 @@ public class ModMenu implements ModMenuApi {
             });
             addLabel(44, y + 6, 150, 12, 0xFFFFFFFF, displayNameFromId(id));
             addWidget(new ColorPreviewWidget(176, y + 2, hitboxType.baseColor));
+            addButton(new ButtonGeneric(202, y, 72, 20, "Delete"), (button, mouseButton) -> deleteHitboxType(hitboxType));
 
             if (!expanded) {
                 return;
@@ -192,13 +193,28 @@ public class ModMenu implements ModMenuApi {
 
             contentY += 4;
             addToggleRow("Enabled", hitboxType.enabled, value -> hitboxType.enabled = value);
-            addTextRow("Entity ID", hitboxType.normalizedId(), value -> hitboxType.id = Config.HitboxType.normalizeId(value));
+            addHitboxTypeIdRow(hitboxType);
             addColorRow("Base Color", hitboxType.baseColor, value -> hitboxType.baseColor = value);
             addColorRow("Eye Color", hitboxType.eyeColor, value -> hitboxType.eyeColor = value);
             addColorRow("Look Direction Color", hitboxType.lookColor, value -> hitboxType.lookColor = value);
             addColorRow("Target Color", hitboxType.targetColor, value -> hitboxType.targetColor = value);
             addColorRow("Hurt Color", hitboxType.hurtColor, value -> hitboxType.hurtColor = value);
             contentY += 4;
+        }
+
+        private void addHitboxTypeIdRow(Config.HitboxType hitboxType) {
+            int y = nextY();
+            addLabel(16, y + 6, 150, 12, 0xFFFFFFFF, "Entity ID");
+            GuiTextFieldGeneric field = new GuiTextFieldGeneric(176, y, 180, 20, font);
+            field.setValueWrapper(hitboxType.normalizedId());
+            addTextField(field, new ChangeListener(value -> hitboxType.id = Config.HitboxType.normalizeId(value)));
+            addButton(new ButtonGeneric(364, y, 72, 20, "Delete"), (button, mouseButton) -> deleteHitboxType(hitboxType));
+        }
+
+        private void deleteHitboxType(Config.HitboxType hitboxType) {
+            expandedTypeIds.remove(hitboxType.normalizedId());
+            config.hitboxTypes.remove(hitboxType);
+            initGui();
         }
 
         private void buildLineWidth() {
