@@ -593,8 +593,8 @@ public class ModMenu implements ModMenuApi {
     }
 
     private static class ToggleButton extends ButtonGeneric {
-        private static final int ON_COLOR = 0xFF55FF55;
-        private static final int OFF_COLOR = 0xFFFF5555;
+        private static final int ON_COLOR = 0xFF00AA00;
+        private static final int OFF_COLOR = 0xFFAA0000;
         private final boolean value;
 
         private ToggleButton(int x, int y, int width, int height, boolean value) {
