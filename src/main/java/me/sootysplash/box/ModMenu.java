@@ -18,7 +18,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 
 import java.awt.Color;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 import java.util.function.Consumer;
 
 public class ModMenu implements ModMenuApi {
@@ -35,6 +37,8 @@ public class ModMenu implements ModMenuApi {
         private Tab selectedTab;
         private int contentY;
         private int scrollOffset;
+        private String typeSearch = "";
+        private final Set<String> expandedTypeIds = new HashSet<>();
 
         private String pendingId = DEFAULT_NEW_ID;
         private int pendingBaseColor;
@@ -129,7 +133,7 @@ public class ModMenu implements ModMenuApi {
         }
 
         private void buildHitboxTypes() {
-            addSection("Add Hitbox Type");
+            addLabel(16, nextY() + 4, 280, 14, 0xFFFFD37A, "Add Hitbox Type");
             addTextRow("Entity ID", pendingId, value -> pendingId = Config.HitboxType.normalizeId(value));
             addColorRow("Base Color", pendingBaseColor, value -> pendingBaseColor = value);
             addColorRow("Eye Color", pendingEyeColor, value -> pendingEyeColor = value);
@@ -141,30 +145,60 @@ public class ModMenu implements ModMenuApi {
                 initGui();
             });
 
-            addSection("Hitbox Types");
+            contentY += 8;
+            addTextRow("Search", typeSearch, value -> {
+                typeSearch = value;
+                initGui();
+            });
+
             config.ensureHitboxTypes();
-            if (config.hitboxTypes.isEmpty()) {
-                addLabel(16, nextY(), 240, 12, 0xFFA0A0A0, "No custom hitbox types yet.");
+            int visibleTypes = 0;
+            String normalizedSearch = normalizeSearch(typeSearch);
+            for (Config.HitboxType hitboxType : config.hitboxTypes) {
+                if (hitboxType == null || !matchesTypeSearch(hitboxType, normalizedSearch)) {
+                    continue;
+                }
+                addHitboxTypeBlock(hitboxType);
+                visibleTypes++;
+            }
+
+            if (visibleTypes == 0) {
+                String message = config.hitboxTypes.isEmpty()
+                        ? "No custom hitbox types yet."
+                        : "No hitbox types match the current search.";
+                addLabel(16, nextY(), 260, 12, 0xFFA0A0A0, message);
+            }
+        }
+
+        private void addHitboxTypeBlock(Config.HitboxType hitboxType) {
+            String id = hitboxType.normalizedId();
+            boolean expanded = expandedTypeIds.contains(id);
+            int y = nextY();
+
+            addButton(new ButtonGeneric(16, y, 20, 20, expanded ? "v" : ">"), (button, mouseButton) -> {
+                if (expanded) {
+                    expandedTypeIds.remove(id);
+                } else {
+                    expandedTypeIds.add(id);
+                }
+                initGui();
+            });
+            addLabel(44, y + 6, 150, 12, 0xFFFFFFFF, displayNameFromId(id));
+            addWidget(new ColorPreviewWidget(176, y + 2, hitboxType.baseColor));
+
+            if (!expanded) {
                 return;
             }
 
-            for (Config.HitboxType hitboxType : config.hitboxTypes) {
-                if (hitboxType == null) {
-                    continue;
-                }
-                addSection(displayNameFromId(hitboxType.normalizedId()));
-                addToggleRow("Enabled", hitboxType.enabled, value -> hitboxType.enabled = value);
-                addTextRow("Entity ID", hitboxType.normalizedId(), value -> hitboxType.id = Config.HitboxType.normalizeId(value));
-                addColorRow("Base Color", hitboxType.baseColor, value -> hitboxType.baseColor = value);
-                addColorRow("Eye Color", hitboxType.eyeColor, value -> hitboxType.eyeColor = value);
-                addColorRow("Look Direction Color", hitboxType.lookColor, value -> hitboxType.lookColor = value);
-                addColorRow("Target Color", hitboxType.targetColor, value -> hitboxType.targetColor = value);
-                addColorRow("Hurt Color", hitboxType.hurtColor, value -> hitboxType.hurtColor = value);
-                addButton(new ButtonGeneric(176, nextY(), 72, 20, "Delete"), (button, mouseButton) -> {
-                    config.hitboxTypes.remove(hitboxType);
-                    initGui();
-                });
-            }
+            contentY += 4;
+            addToggleRow("Enabled", hitboxType.enabled, value -> hitboxType.enabled = value);
+            addTextRow("Entity ID", hitboxType.normalizedId(), value -> hitboxType.id = Config.HitboxType.normalizeId(value));
+            addColorRow("Base Color", hitboxType.baseColor, value -> hitboxType.baseColor = value);
+            addColorRow("Eye Color", hitboxType.eyeColor, value -> hitboxType.eyeColor = value);
+            addColorRow("Look Direction Color", hitboxType.lookColor, value -> hitboxType.lookColor = value);
+            addColorRow("Target Color", hitboxType.targetColor, value -> hitboxType.targetColor = value);
+            addColorRow("Hurt Color", hitboxType.hurtColor, value -> hitboxType.hurtColor = value);
+            contentY += 4;
         }
 
         private void buildLineWidth() {
@@ -284,6 +318,18 @@ public class ModMenu implements ModMenuApi {
                 value = value.substring(namespaceSeparator + 1);
             }
             return value.replace('_', ' ');
+        }
+
+        private static boolean matchesTypeSearch(Config.HitboxType hitboxType, String search) {
+            if (search.isBlank()) {
+                return true;
+            }
+
+            return displayNameFromId(hitboxType.normalizedId()).toLowerCase(Locale.ROOT).contains(search);
+        }
+
+        private static String normalizeSearch(String search) {
+            return search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
         }
 
         private static float clamp(float value, float min, float max) {
