@@ -12,6 +12,7 @@ import fi.dy.masa.malilib.gui.GuiTextFieldGeneric;
 import fi.dy.masa.malilib.gui.button.ButtonGeneric;
 import fi.dy.masa.malilib.gui.interfaces.ITextFieldListener;
 import fi.dy.masa.malilib.render.RenderUtils;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 
@@ -72,7 +73,7 @@ public class ModMenu implements ModMenuApi {
             this.parent = parent;
             this.selectedTab = selectedTab;
             this.setParent(parent);
-            this.setTitle("Hero Hitboxes Config");
+            this.setTitle("Hero Hitboxes Configs - " + modVersion());
             resetPendingHitboxType();
         }
 
@@ -368,6 +369,13 @@ public class ModMenu implements ModMenuApi {
 
         private static String normalizeSearch(String search) {
             return search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
+        }
+
+        private static String modVersion() {
+            return FabricLoader.getInstance()
+                    .getModContainer("hero-hitboxes")
+                    .map(container -> container.getMetadata().getVersion().getFriendlyString())
+                    .orElse("unknown");
         }
 
         private static float clamp(float value, float min, float max) {
