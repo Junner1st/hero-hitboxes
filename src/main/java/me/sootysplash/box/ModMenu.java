@@ -16,7 +16,6 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 
-import java.awt.Color;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -41,6 +40,7 @@ public class ModMenu implements ModMenuApi {
     private static final int COLOR_FIELD_WIDTH = 84;
     private static final int SMALL_BUTTON_WIDTH = 60;
     private static final int DELETE_BUTTON_WIDTH = 58;
+    private static final int ADD_TYPE_BUTTON_WIDTH = 118;
 
     @Override
     public ConfigScreenFactory<?> getModConfigScreenFactory() {
@@ -57,13 +57,7 @@ public class ModMenu implements ModMenuApi {
         private boolean refocusSearchAfterRebuild;
         private int searchCursorPosition;
         private final Set<String> expandedTypeIds = new HashSet<>();
-
-        private String pendingId = DEFAULT_NEW_ID;
-        private int pendingBaseColor;
-        private int pendingEyeColor;
-        private int pendingLookColor;
-        private int pendingTargetColor;
-        private int pendingHurtColor;
+        private final Set<Config.HitboxType> pendingDeletedHitboxTypes = new HashSet<>();
 
         private MalilibConfigScreen(Screen parent) {
             this(parent, Tab.BEHAVIOR);
@@ -74,7 +68,6 @@ public class ModMenu implements ModMenuApi {
             this.selectedTab = selectedTab;
             this.setParent(parent);
             this.setTitle("Hero Hitboxes Configs - " + modVersion());
-            resetPendingHitboxType();
         }
 
         @Override
@@ -95,6 +88,7 @@ public class ModMenu implements ModMenuApi {
             }
 
             addButton(new ButtonGeneric(width - 136, height - 26, SMALL_BUTTON_WIDTH, BUTTON_HEIGHT, "Save"), (button, mouseButton) -> {
+                removePendingDeletedHitboxTypes();
                 config.save();
                 Minecraft.getInstance().setScreen(parent);
             });
@@ -144,26 +138,17 @@ public class ModMenu implements ModMenuApi {
         }
 
         private void buildHitboxTypes() {
-            addLabel(ROW_X, nextY() + 4, 280, 14, 0xFFFFD37A, "Add Hitbox Type");
-            addTextRow("Entity ID", pendingId, value -> pendingId = Config.HitboxType.normalizeId(value));
-            addColorRow("Base Color", pendingBaseColor, value -> pendingBaseColor = value);
-            addColorRow("Eye Color", pendingEyeColor, value -> pendingEyeColor = value);
-            addColorRow("Look Direction Color", pendingLookColor, value -> pendingLookColor = value);
-            addColorRow("Target Color", pendingTargetColor, value -> pendingTargetColor = value);
-            addColorRow("Hurt Color", pendingHurtColor, value -> pendingHurtColor = value);
-            addButton(new ButtonGeneric(CONTROL_X, nextY(), 122, BUTTON_HEIGHT, "Add Hitbox Type"), (button, mouseButton) -> {
-                addPendingHitboxType();
-                initGui();
+            addButton(new ButtonGeneric(width - ADD_TYPE_BUTTON_WIDTH - 16, CONTENT_START_Y - 2, ADD_TYPE_BUTTON_WIDTH, BUTTON_HEIGHT, "Add Hitbox Type"), (button, mouseButton) -> {
+                Minecraft.getInstance().setScreen(new AddHitboxTypeScreen(this));
             });
 
-            contentY += 8;
             addSearchRow();
 
             config.ensureHitboxTypes();
             int visibleTypes = 0;
             String normalizedSearch = normalizeSearch(typeSearch);
             for (Config.HitboxType hitboxType : config.hitboxTypes) {
-                if (hitboxType == null || !matchesTypeSearch(hitboxType, normalizedSearch)) {
+                if (hitboxType == null || pendingDeletedHitboxTypes.contains(hitboxType) || !matchesTypeSearch(hitboxType, normalizedSearch)) {
                     continue;
                 }
                 addHitboxTypeBlock(hitboxType);
@@ -221,7 +206,7 @@ public class ModMenu implements ModMenuApi {
 
         private void deleteHitboxType(Config.HitboxType hitboxType) {
             expandedTypeIds.remove(hitboxType.normalizedId());
-            config.hitboxTypes.remove(hitboxType);
+            pendingDeletedHitboxTypes.add(hitboxType);
             initGui();
         }
 
@@ -235,11 +220,6 @@ public class ModMenu implements ModMenuApi {
             addToggleRow("Outline Enabled", config.outlineEnabled, value -> config.outlineEnabled = value);
             addColorRow("Outline Color", config.outlineColor, value -> config.outlineColor = value);
             addFloatRow("Outline Size Multiplier", config.outlineMultiplier, Math.nextUp(1f), 10, value -> config.outlineMultiplier = value);
-        }
-
-        private void addSection(String label) {
-            addLabel(ROW_X, nextY() + 4, 280, 14, 0xFFFFD37A, label);
-            contentY += 8;
         }
 
         private void addToggleRow(String label, boolean value, Consumer<Boolean> consumer) {
@@ -308,30 +288,12 @@ public class ModMenu implements ModMenuApi {
             return y;
         }
 
-        private void addPendingHitboxType() {
-            String normalizedPendingId = Config.HitboxType.normalizeId(pendingId);
-            if (normalizedPendingId.isBlank()) {
+        private void removePendingDeletedHitboxTypes() {
+            if (pendingDeletedHitboxTypes.isEmpty()) {
                 return;
             }
-
-            config.addHitboxType(
-                    normalizedPendingId,
-                    pendingBaseColor,
-                    pendingEyeColor,
-                    pendingLookColor,
-                    pendingTargetColor,
-                    pendingHurtColor
-            );
-            resetPendingHitboxType();
-        }
-
-        private void resetPendingHitboxType() {
-            pendingId = DEFAULT_NEW_ID;
-            pendingBaseColor = config.hitBoxColor;
-            pendingEyeColor = config.eyeColor;
-            pendingLookColor = config.lookColor;
-            pendingTargetColor = config.targetBoxColor;
-            pendingHurtColor = config.hurtBoxColor;
+            config.hitboxTypes.removeAll(pendingDeletedHitboxTypes);
+            pendingDeletedHitboxTypes.clear();
         }
 
         private static void parseHexColor(String text, int fallback, Consumer<Integer> consumer) {
@@ -378,6 +340,10 @@ public class ModMenu implements ModMenuApi {
                     .orElse("unknown");
         }
 
+        private void refreshAfterChildScreen() {
+            initGui();
+        }
+
         private static float clamp(float value, float min, float max) {
             return Math.max(min, Math.min(max, value));
         }
@@ -400,20 +366,6 @@ public class ModMenu implements ModMenuApi {
             }
         }
 
-        private static class ChangeListener implements ITextFieldListener<GuiTextFieldGeneric> {
-            private final Consumer<String> consumer;
-
-            private ChangeListener(Consumer<String> consumer) {
-                this.consumer = consumer;
-            }
-
-            @Override
-            public boolean onTextChange(GuiTextFieldGeneric textField) {
-                consumer.accept(textField.getValueWrapper());
-                return true;
-            }
-        }
-
         private class SearchChangeListener implements ITextFieldListener<GuiTextFieldGeneric> {
             @Override
             public boolean onTextChange(GuiTextFieldGeneric textField) {
@@ -424,21 +376,117 @@ public class ModMenu implements ModMenuApi {
                 return true;
             }
         }
+    }
 
-        private static class ColorPreviewWidget extends fi.dy.masa.malilib.gui.widgets.WidgetBase {
-            private final int color;
+    private static class AddHitboxTypeScreen extends GuiBase {
+        private final MalilibConfigScreen parent;
+        private final Config config = Config.getInstance();
+        private int contentY;
 
-            private ColorPreviewWidget(int x, int y, int color) {
-                super(x, y, COLOR_PREVIEW_SIZE, COLOR_PREVIEW_SIZE);
-                this.color = color;
+        private String id = DEFAULT_NEW_ID;
+        private int baseColor;
+        private int eyeColor;
+        private int lookColor;
+        private int targetColor;
+        private int hurtColor;
+
+        private AddHitboxTypeScreen(MalilibConfigScreen parent) {
+            this.parent = parent;
+            this.setParent(parent);
+            this.setTitle("Configure Hitbox Type - " + MalilibConfigScreen.modVersion());
+            this.baseColor = config.hitBoxColor;
+            this.eyeColor = config.eyeColor;
+            this.lookColor = config.lookColor;
+            this.targetColor = config.targetBoxColor;
+            this.hurtColor = config.hurtBoxColor;
+        }
+
+        @Override
+        public void initGui() {
+            super.initGui();
+            clearElements();
+
+            addButton(new ButtonGeneric(width - 136, height - 26, SMALL_BUTTON_WIDTH, BUTTON_HEIGHT, "Save"), (button, mouseButton) -> {
+                saveHitboxType();
+                parent.refreshAfterChildScreen();
+                Minecraft.getInstance().setScreen(parent);
+            });
+            addButton(new ButtonGeneric(width - 72, height - 26, SMALL_BUTTON_WIDTH, BUTTON_HEIGHT, "Cancel"), (button, mouseButton) -> {
+                parent.refreshAfterChildScreen();
+                Minecraft.getInstance().setScreen(parent);
+            });
+
+            contentY = CONTENT_START_Y;
+            addTextRow("Entity ID", id, value -> id = Config.HitboxType.normalizeId(value));
+            addColorRow("Base Color", baseColor, value -> baseColor = value);
+            addColorRow("Eye Color", eyeColor, value -> eyeColor = value);
+            addColorRow("Look Direction Color", lookColor, value -> lookColor = value);
+            addColorRow("Target Color", targetColor, value -> targetColor = value);
+            addColorRow("Hurt Color", hurtColor, value -> hurtColor = value);
+        }
+
+        private void saveHitboxType() {
+            String normalizedId = Config.HitboxType.normalizeId(id);
+            if (normalizedId.isBlank()) {
+                return;
             }
 
-            @Override
-            public void render(fi.dy.masa.malilib.render.GuiContext context, int mouseX, int mouseY, boolean selected) {
-                RenderUtils.drawRect(context, x, y, width, height, 0xFF000000);
-                RenderUtils.drawRect(context, x + 1, y + 1, width - 2, height - 2, 0xFF707070);
-                RenderUtils.drawRect(context, x + 2, y + 2, width - 4, height - 4, color);
-            }
+            config.addHitboxType(normalizedId, baseColor, eyeColor, lookColor, targetColor, hurtColor);
+            config.save();
+        }
+
+        private void addTextRow(String label, String value, Consumer<String> consumer) {
+            int y = nextY();
+            addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, label);
+            GuiTextFieldGeneric field = new GuiTextFieldGeneric(CONTROL_X, y, TEXT_FIELD_WIDTH, BUTTON_HEIGHT, font);
+            field.setValueWrapper(value);
+            addTextField(field, new ChangeListener(consumer));
+        }
+
+        private void addColorRow(String label, int value, Consumer<Integer> consumer) {
+            int y = nextY();
+            addLabel(ROW_X, y + LABEL_Y_OFFSET, LABEL_WIDTH, 12, 0xFFFFFFFF, label);
+            addWidget(new ColorPreviewWidget(CONTROL_X, y + 2, value));
+            GuiTextFieldGeneric field = new GuiTextFieldGeneric(COLOR_FIELD_X, y, COLOR_FIELD_WIDTH, BUTTON_HEIGHT, font);
+            field.setMaxLengthWrapper(8);
+            field.setValueWrapper(MalilibConfigScreen.hexColor(value));
+            addTextField(field, new ChangeListener(text -> MalilibConfigScreen.parseHexColor(text, value, consumer)));
+        }
+
+        private int nextY() {
+            int y = contentY;
+            contentY += ROW_HEIGHT;
+            return y;
+        }
+    }
+
+    private static class ChangeListener implements ITextFieldListener<GuiTextFieldGeneric> {
+        private final Consumer<String> consumer;
+
+        private ChangeListener(Consumer<String> consumer) {
+            this.consumer = consumer;
+        }
+
+        @Override
+        public boolean onTextChange(GuiTextFieldGeneric textField) {
+            consumer.accept(textField.getValueWrapper());
+            return true;
+        }
+    }
+
+    private static class ColorPreviewWidget extends fi.dy.masa.malilib.gui.widgets.WidgetBase {
+        private final int color;
+
+        private ColorPreviewWidget(int x, int y, int color) {
+            super(x, y, COLOR_PREVIEW_SIZE, COLOR_PREVIEW_SIZE);
+            this.color = color;
+        }
+
+        @Override
+        public void render(fi.dy.masa.malilib.render.GuiContext context, int mouseX, int mouseY, boolean selected) {
+            RenderUtils.drawRect(context, x, y, width, height, 0xFF000000);
+            RenderUtils.drawRect(context, x + 1, y + 1, width - 2, height - 2, 0xFF707070);
+            RenderUtils.drawRect(context, x + 2, y + 2, width - 4, height - 4, color);
         }
     }
 }
