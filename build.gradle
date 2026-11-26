@@ -19,6 +19,7 @@ repositories {
 	maven { url "https://maven.shedaniel.me/" }
 	maven { url "https://maven.terraformersmc.com/releases/" }
 	maven { url "https://api.modrinth.com/maven" }
+	maven { url "https://maven.fallenbreath.me/releases" }
 }
 
 dependencies {
@@ -33,6 +34,8 @@ dependencies {
 	modImplementation("com.terraformersmc:modmenu:${project.modmenu_version}")
 
     modImplementation "maven.modrinth:malilib:${project.malilib_version}"
+	// MaLiLib bundles this in its published jar, but Loom does not expose the nested jar in runClient.
+	modLocalRuntime "me.fallenbreath:conditional-mixin-fabric:0.6.4"
 }
 
 processResources {
